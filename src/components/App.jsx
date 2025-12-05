@@ -47,6 +47,7 @@ const AppContent = () => {
     <StyledThemeProvider theme={theme}>
       <BrowserRouter>
         <Routes>
+          <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/playground" element={<PlaygroundPage />} />
@@ -80,7 +81,6 @@ const AppContent = () => {
           <Route path="/models/tags/:id" element={<TagDetailPage />} />
           <Route path="/models/teams" element={<TeamsPage />} />
           <Route path="/models/teams/:id" element={<TeamDetailPage />} />
-          <Route path="/" element={<Navigate to="/login" replace />} />
         </Routes>
       </BrowserRouter>
     </StyledThemeProvider>
