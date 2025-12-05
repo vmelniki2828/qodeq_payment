@@ -86,7 +86,7 @@ export const LoginPage = () => {
             fontSize: '28px',
           }}
         >
-          Qodeq Calling Panel
+          Qodeq Payment Panel
         </h2>
 
         <form onSubmit={handleSubmit}>
