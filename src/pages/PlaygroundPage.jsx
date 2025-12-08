@@ -2,11 +2,23 @@ import { useState, useRef } from 'react';
 import styled from 'styled-components';
 import { Layout } from '../components/Layout';
 import { useTheme } from '../contexts/ThemeContext';
+import { HiChevronLeft, HiXMark } from 'react-icons/hi2';
+import { Loader } from '../components/Loader';
+
+// Функция для получения токена из куки
+const getCookie = (name) => {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
+};
 
 const PageContent = styled.div`
   min-height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  height: 100%;
 `;
 
 const OverviewSection = styled.div`
@@ -85,6 +97,7 @@ const ContentWrapper = styled.div`
   flex: 1;
   padding: 20px;
   overflow-y: auto;
+  height: 100%;
 
   &::-webkit-scrollbar {
     width: 8px;
@@ -208,6 +221,126 @@ const FileName = styled.span`
   color: ${({ theme }) => theme.colors.secondary};
 `;
 
+const RemoveFileButton = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: none;
+  background-color: transparent;
+  color: ${({ theme }) => theme.colors.secondary};
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background-color: ${({ theme }) => theme.colors.surface};
+    color: ${({ theme }) => theme.colors.primary};
+  }
+`;
+
+const PageContainer = styled.div`
+  display: flex;
+  flex: 1;
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  height: 100%;
+`;
+
+const LeftPanel = styled.div`
+  width: ${({ $isFullWidth }) => ($isFullWidth ? '100%' : '50%')};
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: width 0.3s ease;
+`;
+
+const Divider = styled.div`
+  width: ${({ $isHidden }) => ($isHidden ? '0' : '1px')};
+  background-color: ${({ theme }) => theme.colors.border};
+  flex-shrink: 0;
+  position: relative;
+  opacity: ${({ $isHidden }) => ($isHidden ? 0 : 1)};
+  pointer-events: ${({ $isHidden }) => ($isHidden ? 'none' : 'auto')};
+  overflow: hidden;
+  transition: opacity 0.3s ease, width 0.3s ease;
+`;
+
+const RightPanel = styled.div`
+  width: ${({ $isVisible }) => ($isVisible ? '50%' : '0')};
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  opacity: ${({ $isVisible }) => ($isVisible ? 1 : 0)};
+  pointer-events: ${({ $isVisible }) => ($isVisible ? 'auto' : 'none')};
+  transition: opacity 0.3s ease, width 0.3s ease;
+`;
+
+const RightContent = styled.div`
+  padding: 20px;
+  overflow-y: auto;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: ${({ theme }) => theme.colors.background};
+    border-radius: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: ${({ theme }) => theme.colors.border};
+    border-radius: 4px;
+
+    &:hover {
+      background: ${({ theme }) => theme.colors.secondary};
+    }
+  }
+`;
+
+const BackButton = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  background-color: ${({ theme }) => theme.colors.background};
+  color: ${({ theme }) => theme.colors.primary};
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  align-self: flex-start;
+  margin-bottom: 20px;
+
+  &:hover {
+    background-color: ${({ theme }) =>
+      theme.colors.primary === '#0D0D0D' ? '#f0f0f0' : 'rgba(255,255,255,0.08)'};
+  }
+`;
+
+const ResultContent = styled.pre`
+  margin: 0;
+  font-size: 12px;
+  color: ${({ theme }) => theme.colors.primary};
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: monospace;
+  background-color: ${({ theme }) => theme.colors.background};
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid ${({ theme }) => theme.colors.border};
+`;
+
 const RunButton = styled.button`
   padding: 6px 12px;
   border-radius: 6px;
@@ -243,6 +376,10 @@ export const PlaygroundPage = () => {
   const [ticketPingValidatorTicketId, setTicketPingValidatorTicketId] = useState('');
   const [classifierMessageText, setClassifierMessageText] = useState('');
   const [classifierContext, setClassifierContext] = useState('');
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [extractorResult, setExtractorResult] = useState(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const fileInputRef = useRef(null);
 
   const tabs = [
@@ -257,14 +394,90 @@ export const PlaygroundPage = () => {
     const file = e.target.files[0];
     if (file) {
       setFileName(file.name);
+      setSelectedFile(file);
     } else {
       setFileName('No file chosen');
+      setSelectedFile(null);
     }
   };
 
-  const handleRunExtractor = () => {
-    // Логика запуска экстрактора
-    console.log('Run Extractor', { ticketId, link, fileName });
+  const handleRemoveFile = () => {
+    setFileName('No file chosen');
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRunExtractor = async () => {
+    setIsLoading(true);
+    setExtractorResult(null);
+    setIsSidebarOpen(true); // Открываем меню сразу при начале загрузки
+
+    try {
+      const token = getCookie('rb_admin_token');
+      const headers = {};
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      let response;
+
+      // Если есть файл - используем by-file endpoint
+      if (selectedFile) {
+        const formData = new FormData();
+        formData.append('ticket_id', ticketId || 'asd');
+        formData.append('file', selectedFile);
+
+        // Не устанавливаем Content-Type для FormData - браузер установит автоматически с boundary
+        const fileHeaders = { ...headers };
+        // Удаляем Content-Type если он был установлен, чтобы браузер мог установить multipart/form-data с boundary
+        delete fileHeaders['Content-Type'];
+
+        response = await fetch('https://repayment.cat-tools.com/api/v1/admin/playground/extractor/by-file', {
+          method: 'POST',
+          headers: fileHeaders,
+          body: formData,
+        });
+      } 
+      // Если нет файла, но есть ticket_id и link - используем by-link endpoint
+      else if (ticketId && link) {
+        const formData = new FormData();
+        formData.append('ticket_id', ticketId);
+        formData.append('link', link);
+
+        // Не устанавливаем Content-Type для FormData - браузер установит автоматически с boundary
+        const linkHeaders = { ...headers };
+        delete linkHeaders['Content-Type'];
+
+        response = await fetch('https://repayment.cat-tools.com/api/v1/admin/playground/extractor/by-link', {
+          method: 'POST',
+          headers: linkHeaders,
+          body: formData,
+        });
+      } else {
+        alert('Пожалуйста, укажите Ticket ID и Link, или загрузите файл');
+        setIsLoading(false);
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setExtractorResult(data);
+    } catch (err) {
+      console.error('Ошибка при выполнении запроса:', err);
+      setExtractorResult({ error: err.message });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCloseSidebar = () => {
+    setIsSidebarOpen(false);
   };
 
   const handleRunTicketDataFull = () => {
@@ -347,7 +560,9 @@ export const PlaygroundPage = () => {
           )}
         </TabsContainer>
 
-        <ContentWrapper>
+        <PageContainer>
+          <LeftPanel $isFullWidth={!isSidebarOpen}>
+            <ContentWrapper>
           {activeTab === 'extractor' && (
             <ExtractorForm>
               <FormGroup>
@@ -391,8 +606,14 @@ export const PlaygroundPage = () => {
                     Choose file
                   </FileInputLabel>
                   <FileName theme={theme}>{fileName}</FileName>
+                  {selectedFile && (
+                    <RemoveFileButton theme={theme} onClick={handleRemoveFile} type="button">
+                      <HiXMark size={16} />
+                    </RemoveFileButton>
+                  )}
                 </FileUploadContainer>
               </FileUploadGroup>
+
             </ExtractorForm>
           )}
 
@@ -507,8 +728,31 @@ export const PlaygroundPage = () => {
                 />
               </FormGroup>
             </ExtractorForm>
-          )}
-        </ContentWrapper>
+            )}
+            </ContentWrapper>
+          </LeftPanel>
+
+          <Divider $isHidden={!isSidebarOpen} theme={theme} />
+
+          <RightPanel $isVisible={isSidebarOpen} theme={theme}>
+            <RightContent theme={theme}>
+              <BackButton onClick={handleCloseSidebar} theme={theme}>
+                <HiChevronLeft size={16} />
+                Back
+              </BackButton>
+
+              {isLoading ? (
+                <Loader />
+              ) : extractorResult && (
+                <ResultContent theme={theme}>
+                  {extractorResult.error 
+                    ? `Ошибка: ${extractorResult.error}`
+                    : JSON.stringify(extractorResult, null, 2)}
+                </ResultContent>
+              )}
+            </RightContent>
+          </RightPanel>
+        </PageContainer>
       </PageContent>
     </Layout>
   );

@@ -1,9 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { Layout } from '../components/Layout';
 import { useTheme } from '../contexts/ThemeContext';
 import { HiArrowLeft, HiArrowRight } from 'react-icons/hi2';
 import { DatePicker } from '../components/DatePicker';
+import { Loader } from '../components/Loader';
+
+// Функция для получения токена из куки
+const getCookie = (name) => {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
+};
 
 const PageContent = styled.div`
   min-height: 100%;
@@ -162,6 +171,52 @@ export const DashboardPage = () => {
   const [activeView, setActiveView] = useState(null);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [statsData, setStatsData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const token = getCookie('rb_admin_token');
+        const headers = {
+          'Content-Type': 'application/json',
+        };
+        
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch('https://repayment.cat-tools.com/api/v1/admin/stats/overview', {
+          method: 'GET',
+          headers,
+        });
+
+        // Если статус 401, просто показываем пустые ячейки
+        if (response.status === 401) {
+          setStatsData(null);
+          setIsLoading(false);
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        setStatsData(data);
+      } catch (err) {
+        console.error('Ошибка при загрузке статистики:', err);
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, []);
 
   const handleSupportClick = () => {
     setActiveView('support');
@@ -247,20 +302,47 @@ export const DashboardPage = () => {
 
         <ContentWrapper>
           {activeView === null && (
-            <StatsCardsContainer>
-              <StatCard theme={theme}>
-                <StatCardLabel theme={theme}>Payments</StatCardLabel>
-                <StatCardValue theme={theme}>-</StatCardValue>
-              </StatCard>
-              <StatCard theme={theme}>
-                <StatCardLabel theme={theme}>Chats</StatCardLabel>
-                <StatCardValue theme={theme}>-</StatCardValue>
-              </StatCard>
-              <StatCard theme={theme}>
-                <StatCardLabel theme={theme}>Tickets</StatCardLabel>
-                <StatCardValue theme={theme}>-</StatCardValue>
-              </StatCard>
-            </StatsCardsContainer>
+            <>
+              {isLoading ? (
+                <Loader />
+              ) : error ? (
+                <div style={{ padding: '20px', textAlign: 'center', color: '#ef4444' }}>
+                  Ошибка при загрузке данных: {error}
+                </div>
+              ) : (
+                <StatsCardsContainer>
+                  {statsData && Object.keys(statsData).length > 0 ? (
+                    Object.entries(statsData).map(([key, value]) => (
+                      <StatCard key={key} theme={theme}>
+                        <StatCardLabel theme={theme}>
+                          {key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ')}
+                        </StatCardLabel>
+                        <StatCardValue theme={theme}>
+                          {typeof value === 'object' && value !== null
+                            ? JSON.stringify(value, null, 2)
+                            : value?.toString() || '-'}
+                        </StatCardValue>
+                      </StatCard>
+                    ))
+                  ) : (
+                    <>
+                      <StatCard theme={theme}>
+                        <StatCardLabel theme={theme}>Payments</StatCardLabel>
+                        <StatCardValue theme={theme}>-</StatCardValue>
+                      </StatCard>
+                      <StatCard theme={theme}>
+                        <StatCardLabel theme={theme}>Chats</StatCardLabel>
+                        <StatCardValue theme={theme}>-</StatCardValue>
+                      </StatCard>
+                      <StatCard theme={theme}>
+                        <StatCardLabel theme={theme}>Tickets</StatCardLabel>
+                        <StatCardValue theme={theme}>-</StatCardValue>
+                      </StatCard>
+                    </>
+                  )}
+                </StatsCardsContainer>
+              )}
+            </>
           )}
           {activeView === 'support' && (
             <div>
