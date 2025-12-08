@@ -301,7 +301,7 @@ export const LoginPage = () => {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               style={{
-                width: '676px',
+                width: '674px',
                 padding: '12px',
                 border: `1px solid ${theme.colors.border}`,
                 borderRadius: '4px',
@@ -335,7 +335,7 @@ export const LoginPage = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 style={{
-                  width: '676px',
+                  width: '674px',
                   padding: '12px',
                   border: `1px solid ${theme.colors.border}`,
                   borderRadius: '4px',
@@ -404,6 +404,7 @@ export const LoginPage = () => {
             style={{
               width: '676px',
               padding: '12px',
+              boxSizing: 'content-box',
               backgroundColor: isLoading ? theme.colors.border : theme.colors.primary,
               color: theme.colors.background,
               border: 'none',
