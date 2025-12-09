@@ -1,9 +1,37 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled, { ThemeProvider } from 'styled-components';
 import { useTheme } from '../contexts/ThemeContext';
 import { Layout } from '../components/Layout';
+import { Loader } from '../components/Loader';
 import { HiPencil, HiTrash, HiArrowUp, HiArrowDown, HiEye, HiChevronLeft } from 'react-icons/hi2';
+
+// Функция для получения токена из куки
+const getCookie = (name) => {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
+};
+
+// Функция для форматирования даты
+const formatDate = (dateString) => {
+  if (!dateString) return '';
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString; // Если дата невалидна, возвращаем исходную строку
+    return date.toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }).replace(',', '');
+  } catch (e) {
+    return dateString;
+  }
+};
 
 const HeaderSection = styled.div`
   display: flex;
@@ -313,6 +341,8 @@ const SaveButton = styled.button`
 const TableContainer = styled.div`
   flex: 1;
   padding: 20px;
+  overflow-y: auto;
+  position: relative;
 `;
 
 const Table = styled.table`
@@ -516,60 +546,6 @@ const PaginationButton = styled.button`
   `}
 `;
 
-// Моковые данные пользователей
-const mockUsers = [
-  {
-    id: 1,
-    _id: '692f327569b12babcd753db0',
-    username: 'VladOK',
-    telegramChatId: '@VladOK151',
-    email: 'v.bernik@softqod.com',
-    roles: '[VIEWER]',
-    active: true,
-    createdAt: '2025-12-02 18:39:49',
-  },
-  {
-    id: 2,
-    _id: '692f327569b12babcd753db1',
-    username: 'pappper',
-    telegramChatId: '@pappper',
-    email: '',
-    roles: '[SUPERUSER]',
-    active: true,
-    createdAt: '2025-11-11 19:05:10',
-  },
-  {
-    id: 3,
-    _id: '692f327569b12babcd753db2',
-    username: 'rp-vova-superadmin',
-    telegramChatId: 'wlozwox',
-    email: 'vova@gmail.com',
-    roles: '[SUPERUSER]',
-    active: true,
-    createdAt: '2025-10-06 13:20:13',
-  },
-  {
-    id: 4,
-    _id: '692f327569b12babcd753db3',
-    username: 'carter',
-    telegramChatId: 'cartertopsupp',
-    email: 'r.carter@softqod.com',
-    roles: '[ADMIN]',
-    active: true,
-    createdAt: '2025-09-16 10:17:37',
-  },
-  {
-    id: 5,
-    _id: '692f327569b12babcd753db4',
-    username: 'rp-superadmin',
-    telegramChatId: 'pappper',
-    email: 'admir@example.com',
-    roles: '[SUPERUSER]',
-    active: true,
-    createdAt: '',
-  },
-];
-
 export const UsersPage = () => {
   const { theme } = useTheme();
   const navigate = useNavigate();
@@ -579,7 +555,8 @@ export const UsersPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingUserId, setEditingUserId] = useState(null);
-  const [users, setUsers] = useState(mockUsers);
+  const [users, setUsers] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [newUser, setNewUser] = useState({
     username: '',
     telegramChatId: '',
@@ -587,6 +564,52 @@ export const UsersPage = () => {
     roles: '[VIEWER]',
     active: true,
   });
+
+  // Загрузка данных пользователей с API
+  const fetchUsers = async () => {
+    setIsLoading(true);
+    try {
+      const token = getCookie('rb_admin_token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const response = await fetch('https://repayment.cat-tools.com/api/v1/admin/users', {
+        method: 'GET',
+        headers,
+      });
+      if (response.status === 401) {
+        setUsers([]);
+        setIsLoading(false);
+        return;
+      }
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      // Преобразуем данные API в формат, который ожидает компонент
+      const formattedUsers = Array.isArray(data) ? data.map((user, index) => ({
+        id: user.id || user._id || index + 1,
+        _id: user._id || user.id,
+        username: user.username || '',
+        telegramChatId: user.telegram_chat_id || user.telegramChatId || '',
+        email: user.email || '',
+        roles: Array.isArray(user.roles) ? `[${user.roles.join(', ')}]` : (user.roles || '[VIEWER]'),
+        active: user.is_active !== undefined ? user.is_active : (user.active !== undefined ? user.active : true),
+        createdAt: user.created_at || user.createdAt || '',
+      })) : [];
+      setUsers(formattedUsers);
+    } catch (err) {
+      console.error('Ошибка при загрузке пользователей:', err);
+      setUsers([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
   const filteredUsers = users.filter((user) => {
     const matchesSearch =
@@ -651,8 +674,7 @@ export const UsersPage = () => {
   };
 
   const handleRefresh = () => {
-    console.log('Refresh users');
-    // Логика обновления списка пользователей
+    fetchUsers();
   };
 
   const handleCreate = () => {
@@ -715,9 +737,10 @@ export const UsersPage = () => {
     handleCloseCreate();
   };
 
-  const handleView = (userId, e) => {
+  const handleView = (user, e) => {
     e?.stopPropagation();
-    navigate(`/models/users/${userId}`);
+    const userId = user._id || user.id;
+    navigate(`/models/users/${userId}`, { state: { userData: user } });
   };
 
   const handleEdit = (userId, e) => {
@@ -810,73 +833,85 @@ export const UsersPage = () => {
           <PageContainer>
             <LeftPanel $isFullWidth={!isCreateOpen}>
               <TableContainer>
-                <Table theme={theme}>
-                  <TableHeader theme={theme}>
-                    <TableHeaderRow>
-                      <TableHeaderCell
-                        theme={theme}
-                        onClick={() => handleSort('username')}
-                        $sorted={sortField === 'username'}
-                      >
-                        Username
-                        <SortIcon>{getSortIcon('username')}</SortIcon>
-                      </TableHeaderCell>
-                      <TableHeaderCell theme={theme}>Telegram Chat ID</TableHeaderCell>
-                      <TableHeaderCell theme={theme}>Email</TableHeaderCell>
-                      <TableHeaderCell theme={theme}>Roles</TableHeaderCell>
-                      <TableHeaderCell theme={theme}>Active</TableHeaderCell>
-                      <TableHeaderCell
-                        theme={theme}
-                        onClick={() => handleSort('created_at')}
-                        $sorted={sortField === 'created_at'}
-                      >
-                        Created At
-                        <SortIcon>{getSortIcon('created_at')}</SortIcon>
-                      </TableHeaderCell>
-                      <TableHeaderCell theme={theme} $width="120px">
-                        Actions
-                      </TableHeaderCell>
-                    </TableHeaderRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedUsers.map((user) => (
-                      <TableRow key={user.id} theme={theme}>
-                        <UsernameCell theme={theme}>{user.username}</UsernameCell>
-                        <TelegramCell theme={theme}>{user.telegramChatId}</TelegramCell>
-                        <EmailCell theme={theme}>{user.email || ''}</EmailCell>
-                        <RolesCell theme={theme}>{user.roles}</RolesCell>
-                        <ActiveCell theme={theme}>
-                          {user.active ? '✓' : ''}
-                        </ActiveCell>
-                        <CreatedAtCell theme={theme}>{user.createdAt}</CreatedAtCell>
-                        <ActionsCell theme={theme}>
+                {isLoading ? (
+                  <Loader />
+                ) : (
+                  <Table theme={theme}>
+                    <TableHeader theme={theme}>
+                      <TableHeaderRow>
+                        <TableHeaderCell
+                          theme={theme}
+                          onClick={() => handleSort('username')}
+                          $sorted={sortField === 'username'}
+                        >
+                          Username
+                          <SortIcon>{getSortIcon('username')}</SortIcon>
+                        </TableHeaderCell>
+                        <TableHeaderCell theme={theme}>Telegram Chat ID</TableHeaderCell>
+                        <TableHeaderCell theme={theme}>Email</TableHeaderCell>
+                        <TableHeaderCell theme={theme}>Roles</TableHeaderCell>
+                        <TableHeaderCell theme={theme}>Active</TableHeaderCell>
+                        <TableHeaderCell
+                          theme={theme}
+                          onClick={() => handleSort('created_at')}
+                          $sorted={sortField === 'created_at'}
+                        >
+                          Created At
+                          <SortIcon>{getSortIcon('created_at')}</SortIcon>
+                        </TableHeaderCell>
+                        <TableHeaderCell theme={theme} $width="120px">
+                          Actions
+                        </TableHeaderCell>
+                      </TableHeaderRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedUsers.length > 0 ? (
+                        paginatedUsers.map((user) => (
+                          <TableRow key={user.id} theme={theme}>
+                            <UsernameCell theme={theme}>{user.username}</UsernameCell>
+                            <TelegramCell theme={theme}>{user.telegramChatId}</TelegramCell>
+                            <EmailCell theme={theme}>{user.email || ''}</EmailCell>
+                            <RolesCell theme={theme}>{user.roles}</RolesCell>
+                            <ActiveCell theme={theme}>
+                              {user.active ? '✓' : ''}
+                            </ActiveCell>
+                            <CreatedAtCell theme={theme}>{formatDate(user.createdAt)}</CreatedAtCell>
+                            <ActionsCell theme={theme}>
                           <ActionButton
                             theme={theme}
-                            onClick={(e) => handleView(user.id, e)}
+                            onClick={(e) => handleView(user, e)}
                             title="View"
                           >
                             <HiEye size={16} />
                           </ActionButton>
-                          <ActionButton
-                            theme={theme}
-                            onClick={(e) => handleEdit(user.id, e)}
-                            title="Edit"
-                          >
-                            <HiPencil size={16} />
-                          </ActionButton>
-                          <ActionButton
-                            theme={theme}
-                            $danger
-                            onClick={(e) => handleDelete(user.id, e)}
-                            title="Delete"
-                          >
-                            <HiTrash size={16} />
-                          </ActionButton>
-                        </ActionsCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                              <ActionButton
+                                theme={theme}
+                                onClick={(e) => handleEdit(user.id, e)}
+                                title="Edit"
+                              >
+                                <HiPencil size={16} />
+                              </ActionButton>
+                              <ActionButton
+                                theme={theme}
+                                $danger
+                                onClick={(e) => handleDelete(user.id, e)}
+                                title="Delete"
+                              >
+                                <HiTrash size={16} />
+                              </ActionButton>
+                            </ActionsCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow theme={theme}>
+                          <TableCell theme={theme} colSpan={7} style={{ textAlign: 'center', padding: '40px' }}>
+                            Нет данных
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                )}
               </TableContainer>
             </LeftPanel>
 

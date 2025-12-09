@@ -480,9 +480,40 @@ export const PlaygroundPage = () => {
     setIsSidebarOpen(false);
   };
 
-  const handleRunTicketDataFull = () => {
-    // Логика запуска Ticket Data (Full)
-    console.log('Run Ticket Data (Full)', { ticketId: ticketDataFullTicketId, projects: ticketDataFullProjects });
+  const handleRunTicketDataFull = async () => {
+    setIsLoading(true);
+    setExtractorResult(null);
+    setIsSidebarOpen(true); // Открываем меню сразу при начале загрузки
+
+    try {
+      const token = getCookie('rb_admin_token');
+      const headers = { 'Content-Type': 'application/json' };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch('https://repayment.cat-tools.com/api/v1/admin/playground/ticket-data/full', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          ticket_id: ticketDataFullTicketId || 'фыв',
+          projects: ticketDataFullProjects || 'фыв',
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setExtractorResult(data);
+    } catch (err) {
+      console.error('Ошибка при выполнении запроса:', err);
+      setExtractorResult({ error: err.message });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleRunTicketDataLite = () => {

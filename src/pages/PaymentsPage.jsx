@@ -1,9 +1,37 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled, { ThemeProvider } from 'styled-components';
 import { useTheme } from '../contexts/ThemeContext';
 import { Layout } from '../components/Layout';
+import { Loader } from '../components/Loader';
 import { HiPencil, HiTrash, HiArrowUp, HiArrowDown, HiEye, HiChevronLeft } from 'react-icons/hi2';
+
+// Функция для получения токена из куки
+const getCookie = (name) => {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
+};
+
+// Функция для форматирования даты
+const formatDate = (dateString) => {
+  if (!dateString) return '';
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+    return date.toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }).replace(',', '');
+  } catch (e) {
+    return dateString;
+  }
+};
 
 const HeaderSection = styled.div`
   display: flex;
@@ -125,6 +153,8 @@ const SortSelect = styled.select`
 const TableContainer = styled.div`
   flex: 1;
   padding: 20px;
+  overflow-y: auto;
+  position: relative;
 `;
 
 const Table = styled.table`
@@ -515,138 +545,11 @@ const SaveButton = styled.button`
   }
 `;
 
-// Моковые данные платежей
-const mockPayments = [
-  {
-    id: 1,
-    _id: '692ef39e1c07e718483352f1',
-    name: 'hgategelato',
-    activeOpen: true,
-    activePending: true,
-    externalIdType: 'transaction_reference',
-    createdAt: '2025-12-02 14:11:42',
-    updatedAt: '2025-12-02 14:11:42',
-    tagIds: [
-      '4f368b69-118c-41b3-b5b5-8b5a17e74a79',
-      '38ed4e48-40a7-464c-b76d-efce8688312f',
-      '3434a9fd-a77e-431b-821d-57454c22a6ba',
-      '5d45e65a-d4d7-4e12-b689-e54100f03127',
-    ],
-    gatewayIds: [
-      '692ef3bf1a9b21f5a26a7394',
-      '692ef4611a9b21f5a26a742f',
-      '692ef48f69b12babcd7521ea',
-      '692ef4db1a9b21f5a26a74a1',
-    ],
-    tagsDetail: [
-      { uuid: '4f368b69-118c-41b3-b5b5-8b5a17e74a79', id: 1, name: 'GELATO_SBP_ALFA_H2H_PAY_IN_TRUSTED' },
-      { uuid: '38ed4e48-40a7-464c-b76d-efce8688312f', id: 2, name: 'GELATO_SBP_ALFA_H2H_PAY_IN_FTD' },
-      { uuid: '3434a9fd-a77e-431b-821d-57454c22a6ba', id: 3, name: 'GELATO_P2P_RUB_H2H_PAY-IN' },
-      { uuid: '5d45e65a-d4d7-4e12-b689-e54100f03127', id: 4, name: 'GELATO_SBP_RUB_H2H_PAY-IN_TRUSTED' },
-    ],
-    gatewaysDetail: [
-      { id: '692ef3bf1a9b21f5a26a7394', name: 'GELATO_P2P_RUB_H2H_PAY-IN' },
-      { id: '692ef4611a9b21f5a26a742f', name: 'GELATO_SBP_ALFA_H2H_PAY_IN_FTD' },
-      { id: '692ef48f69b12babcd7521ea', name: 'GELATO_SBP_ALFA_H2H_PAY_IN_TRUSTED' },
-      { id: '692ef4db1a9b21f5a26a74a1', name: 'GELATO_SBP_RUB_H2H_PAY-IN_TRUSTED' },
-    ],
-  },
-  {
-    id: 2,
-    _id: '692eeff469b12babcd752019',
-    name: '1pat',
-    activeOpen: true,
-    activePending: true,
-    externalIdType: 'transaction_reference',
-    createdAt: '2025-12-02 13:56:04',
-  },
-  {
-    id: 3,
-    _id: '692eea221a9b21f5a26a6c9f',
-    name: 'hgatesarexpay',
-    activeOpen: false,
-    activePending: false,
-    externalIdType: 'hgate_id',
-    createdAt: '2025-11-04 11:01:21',
-  },
-  {
-    id: 4,
-    _id: '692eea221a9b21f5a26a6ca0',
-    name: 'hgatepropayller',
-    activeOpen: true,
-    activePending: true,
-    externalIdType: 'transaction_reference',
-    createdAt: '2025-11-04 10:58:15',
-  },
-  {
-    id: 5,
-    _id: '692eea221a9b21f5a26a6ca1',
-    name: 'hgateargospay',
-    activeOpen: true,
-    activePending: true,
-    externalIdType: 'hgate_id',
-    createdAt: '2025-11-04 10:55:30',
-  },
-  {
-    id: 6,
-    _id: '692eea221a9b21f5a26a6ca2',
-    name: 'hgateikra',
-    activeOpen: true,
-    activePending: true,
-    externalIdType: 'transaction_reference',
-    createdAt: '2025-11-04 10:52:45',
-  },
-  {
-    id: 7,
-    _id: '692eea221a9b21f5a26a6ca3',
-    name: 'hgatetrustcloud',
-    activeOpen: true,
-    activePending: true,
-    externalIdType: 'hgate_id',
-    createdAt: '2025-11-04 10:50:00',
-  },
-  {
-    id: 8,
-    _id: '692eea221a9b21f5a26a6ca4',
-    name: 'hgatebigldea',
-    activeOpen: true,
-    activePending: true,
-    externalIdType: 'transaction_reference',
-    createdAt: '2025-11-04 10:47:15',
-  },
-  {
-    id: 9,
-    _id: '692eea221a9b21f5a26a6ca5',
-    name: 'hgatepaytop',
-    activeOpen: false,
-    activePending: true,
-    externalIdType: 'hgate_id',
-    createdAt: '2025-11-04 10:44:30',
-  },
-  {
-    id: 10,
-    _id: '692eea221a9b21f5a26a6ca6',
-    name: 'hgatenextgen',
-    activeOpen: true,
-    activePending: true,
-    externalIdType: 'transaction_reference',
-    createdAt: '2025-11-04 10:41:45',
-  },
-  {
-    id: 11,
-    _id: '692eea221a9b21f5a26a6ca7',
-    name: 'IDMhgate',
-    activeOpen: true,
-    activePending: true,
-    externalIdType: 'hgate_id',
-    createdAt: '2025-11-04 10:39:00',
-  },
-];
-
 export const PaymentsPage = () => {
   const { theme } = useTheme();
   const navigate = useNavigate();
-  const [payments, setPayments] = useState(mockPayments);
+  const [payments, setPayments] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState('created_at');
   const [sortDirection, setSortDirection] = useState('desc');
@@ -659,6 +562,56 @@ export const PaymentsPage = () => {
     activePending: true,
     externalIdType: 'transaction_reference',
   });
+
+  // Загрузка данных платежей с API
+  const fetchPayments = async () => {
+    setIsLoading(true);
+    try {
+      const token = getCookie('rb_admin_token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const response = await fetch('https://repayment.cat-tools.com/api/v1/admin/payments', {
+        method: 'GET',
+        headers,
+      });
+      if (response.status === 401) {
+        setPayments([]);
+        setIsLoading(false);
+        return;
+      }
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      // Преобразуем данные API в формат, который ожидает компонент
+      const formattedPayments = Array.isArray(data) ? data.map((payment, index) => ({
+        id: payment.id || payment._id || index + 1,
+        _id: payment._id || payment.id,
+        name: payment.name || '',
+        activeOpen: payment.active_open !== undefined ? payment.active_open : (payment.activeOpen !== undefined ? payment.activeOpen : true),
+        activePending: payment.active_pending !== undefined ? payment.active_pending : (payment.activePending !== undefined ? payment.activePending : true),
+        externalIdType: payment.external_id_type || payment.externalIdType || '',
+        createdAt: payment.created_at || payment.createdAt || '',
+        updatedAt: payment.updated_at || payment.updatedAt || '',
+        tagIds: payment.tag_ids || payment.tagIds || [],
+        gatewayIds: payment.gateway_ids || payment.gatewayIds || [],
+        tagsDetail: payment.tags_detail || payment.tagsDetail || [],
+        gatewaysDetail: payment.gateways_detail || payment.gatewaysDetail || [],
+      })) : [];
+      setPayments(formattedPayments);
+    } catch (err) {
+      console.error('Ошибка при загрузке платежей:', err);
+      setPayments([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPayments();
+  }, []);
 
   const filteredPayments = payments.filter((payment) => {
     const matchesSearch =
@@ -719,7 +672,7 @@ export const PaymentsPage = () => {
   };
 
   const handleRefresh = () => {
-    console.log('Refresh payments');
+    fetchPayments();
   };
 
   const handleCreate = () => {
@@ -881,103 +834,115 @@ export const PaymentsPage = () => {
           <PageContainer>
             <LeftPanel $isFullWidth={!isCreateOpen}>
               <TableContainer>
-            <Table theme={theme}>
-              <TableHeader theme={theme}>
-                <TableHeaderRow>
-                  <TableHeaderCell
-                    theme={theme}
-                    onClick={() => handleSort('_id')}
-                    $sorted={sortField === '_id'}
-                  >
-                    ID
-                    <SortIcon>{getSortIcon('_id')}</SortIcon>
-                  </TableHeaderCell>
-                  <TableHeaderCell
-                    theme={theme}
-                    onClick={() => handleSort('name')}
-                    $sorted={sortField === 'name'}
-                  >
-                    Name
-                    <SortIcon>{getSortIcon('name')}</SortIcon>
-                  </TableHeaderCell>
-                  <TableHeaderCell
-                    theme={theme}
-                    onClick={() => handleSort('active_open')}
-                    $sorted={sortField === 'active_open'}
-                  >
-                    Active (Open)
-                    <SortIcon>{getSortIcon('active_open')}</SortIcon>
-                  </TableHeaderCell>
-                  <TableHeaderCell
-                    theme={theme}
-                    onClick={() => handleSort('active_pending')}
-                    $sorted={sortField === 'active_pending'}
-                  >
-                    Active (Pending)
-                    <SortIcon>{getSortIcon('active_pending')}</SortIcon>
-                  </TableHeaderCell>
-                  <TableHeaderCell
-                    theme={theme}
-                    onClick={() => handleSort('external_id_type')}
-                    $sorted={sortField === 'external_id_type'}
-                  >
-                    External ID Type
-                    <SortIcon>{getSortIcon('external_id_type')}</SortIcon>
-                  </TableHeaderCell>
-                  <TableHeaderCell
-                    theme={theme}
-                    onClick={() => handleSort('created_at')}
-                    $sorted={sortField === 'created_at'}
-                  >
-                    Created At
-                    <SortIcon>{getSortIcon('created_at')}</SortIcon>
-                  </TableHeaderCell>
-                  <TableHeaderCell theme={theme} $width="120px">
-                    Actions
-                  </TableHeaderCell>
-                </TableHeaderRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedPayments.map((payment) => (
-                  <TableRow key={payment.id} theme={theme}>
-                    <IdCell theme={theme}>{payment._id}</IdCell>
-                    <NameCell theme={theme}>{payment.name}</NameCell>
-                    <ActiveCell theme={theme} $active={payment.activeOpen}>
-                      {payment.activeOpen ? '✓' : '✗'}
-                    </ActiveCell>
-                    <ActiveCell theme={theme} $active={payment.activePending}>
-                      {payment.activePending ? '✓' : '✗'}
-                    </ActiveCell>
-                    <ExternalIdTypeCell theme={theme}>{payment.externalIdType}</ExternalIdTypeCell>
-                    <CreatedAtCell theme={theme}>{payment.createdAt}</CreatedAtCell>
-                    <ActionsCell theme={theme}>
-                      <ActionButton
-                        theme={theme}
-                        onClick={(e) => handleView(payment.id, e)}
-                        title="View"
-                      >
-                        <HiEye size={16} />
-                      </ActionButton>
-                      <ActionButton
-                        theme={theme}
-                        onClick={(e) => handleEdit(payment.id, e)}
-                        title="Edit"
-                      >
-                        <HiPencil size={16} />
-                      </ActionButton>
-                      <ActionButton
-                        theme={theme}
-                        $danger
-                        onClick={(e) => handleDelete(payment.id, e)}
-                        title="Delete"
-                      >
-                        <HiTrash size={16} />
-                      </ActionButton>
-                    </ActionsCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                {isLoading ? (
+                  <Loader />
+                ) : (
+                  <Table theme={theme}>
+                    <TableHeader theme={theme}>
+                      <TableHeaderRow>
+                        <TableHeaderCell
+                          theme={theme}
+                          onClick={() => handleSort('_id')}
+                          $sorted={sortField === '_id'}
+                        >
+                          ID
+                          <SortIcon>{getSortIcon('_id')}</SortIcon>
+                        </TableHeaderCell>
+                        <TableHeaderCell
+                          theme={theme}
+                          onClick={() => handleSort('name')}
+                          $sorted={sortField === 'name'}
+                        >
+                          Name
+                          <SortIcon>{getSortIcon('name')}</SortIcon>
+                        </TableHeaderCell>
+                        <TableHeaderCell
+                          theme={theme}
+                          onClick={() => handleSort('active_open')}
+                          $sorted={sortField === 'active_open'}
+                        >
+                          Active (Open)
+                          <SortIcon>{getSortIcon('active_open')}</SortIcon>
+                        </TableHeaderCell>
+                        <TableHeaderCell
+                          theme={theme}
+                          onClick={() => handleSort('active_pending')}
+                          $sorted={sortField === 'active_pending'}
+                        >
+                          Active (Pending)
+                          <SortIcon>{getSortIcon('active_pending')}</SortIcon>
+                        </TableHeaderCell>
+                        <TableHeaderCell
+                          theme={theme}
+                          onClick={() => handleSort('external_id_type')}
+                          $sorted={sortField === 'external_id_type'}
+                        >
+                          External ID Type
+                          <SortIcon>{getSortIcon('external_id_type')}</SortIcon>
+                        </TableHeaderCell>
+                        <TableHeaderCell
+                          theme={theme}
+                          onClick={() => handleSort('created_at')}
+                          $sorted={sortField === 'created_at'}
+                        >
+                          Created At
+                          <SortIcon>{getSortIcon('created_at')}</SortIcon>
+                        </TableHeaderCell>
+                        <TableHeaderCell theme={theme} $width="120px">
+                          Actions
+                        </TableHeaderCell>
+                      </TableHeaderRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedPayments.length > 0 ? (
+                        paginatedPayments.map((payment) => (
+                          <TableRow key={payment.id} theme={theme}>
+                            <IdCell theme={theme}>{payment._id}</IdCell>
+                            <NameCell theme={theme}>{payment.name}</NameCell>
+                            <ActiveCell theme={theme} $active={payment.activeOpen}>
+                              {payment.activeOpen ? '✓' : '✗'}
+                            </ActiveCell>
+                            <ActiveCell theme={theme} $active={payment.activePending}>
+                              {payment.activePending ? '✓' : '✗'}
+                            </ActiveCell>
+                            <ExternalIdTypeCell theme={theme}>{payment.externalIdType}</ExternalIdTypeCell>
+                            <CreatedAtCell theme={theme}>{formatDate(payment.createdAt)}</CreatedAtCell>
+                            <ActionsCell theme={theme}>
+                              <ActionButton
+                                theme={theme}
+                                onClick={(e) => handleView(payment.id, e)}
+                                title="View"
+                              >
+                                <HiEye size={16} />
+                              </ActionButton>
+                              <ActionButton
+                                theme={theme}
+                                onClick={(e) => handleEdit(payment.id, e)}
+                                title="Edit"
+                              >
+                                <HiPencil size={16} />
+                              </ActionButton>
+                              <ActionButton
+                                theme={theme}
+                                $danger
+                                onClick={(e) => handleDelete(payment.id, e)}
+                                title="Delete"
+                              >
+                                <HiTrash size={16} />
+                              </ActionButton>
+                            </ActionsCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow theme={theme}>
+                          <TableCell theme={theme} colSpan={7} style={{ textAlign: 'center', padding: '40px' }}>
+                            Нет данных
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                )}
               </TableContainer>
             </LeftPanel>
 

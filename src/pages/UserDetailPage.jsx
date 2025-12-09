@@ -1,9 +1,28 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import styled, { ThemeProvider } from 'styled-components';
 import { useTheme } from '../contexts/ThemeContext';
 import { Layout } from '../components/Layout';
 import { HiArrowPath, HiPencil, HiTrash, HiUserCircle, HiChevronLeft } from 'react-icons/hi2';
+
+// Функция для форматирования даты
+const formatDate = (dateString) => {
+  if (!dateString) return '';
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+    return date.toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }).replace(',', '');
+  } catch (e) {
+    return dateString;
+  }
+};
 
 const PageContent = styled.div`
   height: 100%;
@@ -222,55 +241,26 @@ const ValueCell = styled(TableCell)`
   font-size: 12px;
 `;
 
-// Моковые данные пользователей
-const mockUsers = [
-  {
-    id: 1,
-    _id: '692f327569b12babcd753db0',
-    username: 'VladOK',
-    telegramChatId: '@VladOK151',
-    email: 'v.bernik@softqod.com',
-    roles: ['VIEWER'],
-    permissions: [],
-    isActive: true,
-    createdAt: '2025-12-02 18:39:49',
-    updatedAt: '2025-12-02 18:39:49',
-    ipWhitelist: [],
-    resourceWhitelist: [],
-    allowedPaymentNames: [],
-  },
-  {
-    id: 2,
-    _id: '692f327569b12babcd753db1',
-    username: 'pappper',
-    telegramChatId: '@pappper',
-    email: '',
-    roles: ['SUPERUSER'],
-    permissions: [],
-    isActive: true,
-    createdAt: '2025-11-11 19:05:10',
-    updatedAt: '2025-11-11 19:05:10',
-    ipWhitelist: [],
-    resourceWhitelist: [],
-    allowedPaymentNames: [],
-  },
-];
-
 export const UserDetailPage = () => {
   const { theme } = useTheme();
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    // Находим пользователя по ID
-    const foundUser = mockUsers.find((u) => u.id === Number(id) || u._id === id);
-    setUser(foundUser || null);
-  }, [id]);
+    // Используем данные, переданные через навигацию
+    if (location.state?.userData) {
+      setUser(location.state.userData);
+    } else {
+      // Если данные не переданы, показываем сообщение об ошибке
+      setUser(null);
+    }
+  }, [location.state, id]);
 
   const handleRefresh = () => {
-    console.log('Refresh user', id);
-    // Логика обновления данных пользователя
+    // Возвращаемся к списку для обновления данных
+    navigate('/models/users');
   };
 
   const handleEdit = () => {
@@ -292,18 +282,20 @@ export const UserDetailPage = () => {
   if (!user) {
     return (
       <Layout>
-        <PageContent>
-          <ContentWrapper>
-            <div>User not found</div>
-          </ContentWrapper>
-        </PageContent>
+        <ThemeProvider theme={theme}>
+          <PageContent>
+            <ContentWrapper>
+              <div>Пользователь не найден</div>
+            </ContentWrapper>
+          </PageContent>
+        </ThemeProvider>
       </Layout>
     );
   }
 
   const formatValue = (value) => {
     if (Array.isArray(value)) {
-      return JSON.stringify(value);
+      return value.length > 0 ? JSON.stringify(value) : '[]';
     }
     if (typeof value === 'boolean') {
       return value.toString();
@@ -314,20 +306,15 @@ export const UserDetailPage = () => {
     return String(value);
   };
 
-  const fields = [
-    { field: '_id', value: user._id },
-    { field: 'created_at', value: user.createdAt },
-    { field: 'updated_at', value: user.updatedAt },
-    { field: 'username', value: user.username },
-    { field: 'email', value: user.email },
-    { field: 'telegram_chat_id', value: user.telegramChatId },
-    { field: 'roles', value: user.roles },
-    { field: 'permissions', value: user.permissions },
-    { field: 'is_active', value: user.isActive },
-    { field: 'ip_whitelist', value: user.ipWhitelist },
-    { field: 'resource_whitelist', value: user.resourceWhitelist },
-    { field: 'allowed_payment_names', value: user.allowedPaymentNames },
-  ];
+  // Формируем список всех полей пользователя для отображения
+  const fields = Object.keys(user).map((key) => {
+    let value = user[key];
+    // Форматируем даты
+    if (key === 'created_at' || key === 'updated_at' || key === 'createdAt' || key === 'updatedAt') {
+      value = formatDate(value);
+    }
+    return { field: key, value };
+  });
 
   return (
     <Layout>
@@ -337,10 +324,10 @@ export const UserDetailPage = () => {
             <UserInfo>
               <UserIcon theme={theme} />
               <UserDetails>
-                <Username theme={theme}>{user.username}</Username>
-                <Email theme={theme}>{user.email || 'No email'}</Email>
+                <Username theme={theme}>{user.username || '—'}</Username>
+                <Email theme={theme}>{user.email || 'Нет email'}</Email>
               </UserDetails>
-              {user.isActive && <StatusBadge>Active</StatusBadge>}
+              {(user.is_active !== undefined ? user.is_active : user.isActive) && <StatusBadge>Active</StatusBadge>}
             </UserInfo>
             <ButtonsGroup>
               <Button theme={theme} onClick={handleRefresh}>
@@ -368,34 +355,34 @@ export const UserDetailPage = () => {
               <ProfileGrid>
                 <ProfileItem>
                   <ProfileLabel theme={theme}>ID</ProfileLabel>
-                  <ProfileValue theme={theme}>{user._id}</ProfileValue>
+                  <ProfileValue theme={theme}>{user._id || user.id || '—'}</ProfileValue>
                 </ProfileItem>
                 <ProfileItem>
                   <ProfileLabel theme={theme}>Username</ProfileLabel>
-                  <ProfileValue theme={theme}>{user.username}</ProfileValue>
+                  <ProfileValue theme={theme}>{user.username || '—'}</ProfileValue>
                 </ProfileItem>
                 <ProfileItem>
                   <ProfileLabel theme={theme}>Email</ProfileLabel>
                   <ProfileValue theme={theme}>{user.email || '—'}</ProfileValue>
                 </ProfileItem>
                 <ProfileItem>
-                  <ProfileLabel theme={theme}>Roles</ProfileLabel>
-                  <ProfileValue theme={theme}>
-                    {Array.isArray(user.roles) ? user.roles.join(', ') : user.roles}
-                  </ProfileValue>
+                  <ProfileLabel theme={theme}>Telegram Chat ID</ProfileLabel>
+                  <ProfileValue theme={theme}>{user.telegram_chat_id || user.telegramChatId || '—'}</ProfileValue>
                 </ProfileItem>
                 <ProfileItem>
-                  <ProfileLabel theme={theme}>Permissions</ProfileLabel>
+                  <ProfileLabel theme={theme}>Roles</ProfileLabel>
                   <ProfileValue theme={theme}>
-                    {user.permissions && user.permissions.length > 0
-                      ? user.permissions.join(', ')
-                      : '—'}
+                    {Array.isArray(user.roles) 
+                      ? user.roles.length > 0 
+                        ? `[${user.roles.join(', ')}]` 
+                        : '—'
+                      : user.roles || '—'}
                   </ProfileValue>
                 </ProfileItem>
                 <ProfileItem>
                   <ProfileLabel theme={theme}>Status</ProfileLabel>
                   <ProfileValue theme={theme}>
-                    {user.isActive ? (
+                    {(user.is_active !== undefined ? user.is_active : user.isActive) ? (
                       <StatusBadge>Active</StatusBadge>
                     ) : (
                       <span>Inactive</span>
