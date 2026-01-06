@@ -6,6 +6,7 @@ import { DashboardPage } from '../pages/DashboardPage';
 import { PlaygroundPage } from '../pages/PlaygroundPage';
 import { SystemPage } from '../pages/SystemPage';
 import { TelegramToolsPage } from '../pages/TelegramToolsPage';
+import { OpenAIStatsPage } from '../pages/OpenAIStatsPage';
 import { UsersPage } from '../pages/UsersPage';
 import { UserDetailPage } from '../pages/UserDetailPage';
 import { PaymentsPage } from '../pages/PaymentsPage';
@@ -53,6 +54,7 @@ const AppContent = () => {
           <Route path="/playground" element={<PlaygroundPage />} />
           <Route path="/system" element={<SystemPage />} />
           <Route path="/telegram-tools" element={<TelegramToolsPage />} />
+          <Route path="/openai-stats" element={<OpenAIStatsPage />} />
           <Route path="/models/users" element={<UsersPage />} />
           <Route path="/models/users/:id" element={<UserDetailPage />} />
           <Route path="/models/payments" element={<PaymentsPage />} />
