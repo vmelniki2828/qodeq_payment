@@ -410,8 +410,24 @@ export const OpenAIStatsPage = () => {
         || totalData.cost_without_cache 
         || (totalSpending + cacheSavings);
 
-      // Данные по воркерам (пока используем моковые данные)
-      const workersData = [];
+      // Запрос данных по воркерам
+      let workersData = [];
+      try {
+        const byWorkerUrl = `https://repayment.cat-tools.com/api/v1/openai-stats/by-worker${queryString ? `?${queryString}` : ''}`;
+        const byWorkerResponse = await fetch(byWorkerUrl, {
+          method: 'GET',
+          headers,
+        });
+
+        if (byWorkerResponse.ok) {
+          const byWorkerData = await byWorkerResponse.json();
+          if (byWorkerData.workers && Array.isArray(byWorkerData.workers)) {
+            workersData = byWorkerData.workers;
+          }
+        }
+      } catch (err) {
+        console.warn('Не удалось загрузить данные по воркерам:', err);
+      }
 
       // Формируем структуру данных
       const formattedData = {
@@ -420,19 +436,20 @@ export const OpenAIStatsPage = () => {
         costWithoutCache: costWithoutCache || totalSpending,
         workers: workersData.length > 0 
           ? workersData.map((w) => {
-              const workerCostWithoutCache = w.cost_without_cache || w.total_cost || w.cost || 0;
-              const workerTotalCost = w.total_cost || w.cost || 0;
-              const workerCacheSavings = w.cache_savings !== undefined
-                ? w.cache_savings
-                : Math.max(0, workerCostWithoutCache - workerTotalCost);
+              const workerTotalCost = w.total_cost || 0;
+              const workerCacheSavings = w.cached_savings !== undefined
+                ? w.cached_savings
+                : 0;
+              // Вычисляем cost without cache: totalCost + cachedSavings
+              const workerCostWithoutCache = workerTotalCost + workerCacheSavings;
 
               return {
                 worker: w.worker_name || w.worker || 'Unknown',
-                requests: w.requests || w.request_count || 0,
+                requests: w.request_count || w.requests || 0,
                 totalTokens: w.total_tokens || w.tokens || 0,
                 totalCost: workerTotalCost,
                 cacheSavings: workerCacheSavings,
-                costWithoutCache: workerCostWithoutCache || workerTotalCost,
+                costWithoutCache: workerCostWithoutCache,
               };
             })
           : mockData.workers, // Fallback на моковые данные, если API не вернул данные по воркерам
