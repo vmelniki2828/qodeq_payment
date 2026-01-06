@@ -35,6 +35,8 @@ import { TagsPage } from '../pages/TagsPage';
 import { TagDetailPage } from '../pages/TagDetailPage';
 import { TeamsPage } from '../pages/TeamsPage';
 import { TeamDetailPage } from '../pages/TeamDetailPage';
+import { SupportMessagesStatsPage } from '../pages/SupportMessagesStatsPage';
+import { HelpdeskTagsStatsPage } from '../pages/HelpdeskTagsStatsPage';
 
 const AppContent = () => {
   const { theme } = useTheme();
@@ -55,6 +57,8 @@ const AppContent = () => {
           <Route path="/system" element={<SystemPage />} />
           <Route path="/telegram-tools" element={<TelegramToolsPage />} />
           <Route path="/openai-stats" element={<OpenAIStatsPage />} />
+          <Route path="/support-messages-stats" element={<SupportMessagesStatsPage />} />
+          <Route path="/helpdesk-tags-stats" element={<HelpdeskTagsStatsPage />} />
           <Route path="/models/users" element={<UsersPage />} />
           <Route path="/models/users/:id" element={<UserDetailPage />} />
           <Route path="/models/payments" element={<PaymentsPage />} />

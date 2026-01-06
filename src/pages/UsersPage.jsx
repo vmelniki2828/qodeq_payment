@@ -160,7 +160,7 @@ const PageContainer = styled.div`
 `;
 
 const LeftPanel = styled.div`
-  width: ${({ $isFullWidth }) => ($isFullWidth ? '100%' : '75%')};
+  width: ${({ $isFullWidth }) => ($isFullWidth ? '100%' : '65%')};
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -180,7 +180,7 @@ const Divider = styled.div`
 `;
 
 const RightPanel = styled.div`
-  width: ${({ $isVisible }) => ($isVisible ? '25%' : '0')};
+  width: ${({ $isVisible }) => ($isVisible ? '35%' : '0')};
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -561,7 +561,12 @@ export const UsersPage = () => {
     username: '',
     telegramChatId: '',
     email: '',
+    password: '',
     roles: '[VIEWER]',
+    permissions: '',
+    ip_whitelist: '',
+    resource_whitelist: '',
+    allowed_payment_names: '',
     active: true,
   });
 
@@ -683,7 +688,12 @@ export const UsersPage = () => {
       username: '',
       telegramChatId: '',
       email: '',
+      password: '',
       roles: '[VIEWER]',
+      permissions: '',
+      ip_whitelist: '',
+      resource_whitelist: '',
+      allowed_payment_names: '',
       active: true,
     });
     setIsCreateOpen(true);
@@ -696,12 +706,17 @@ export const UsersPage = () => {
       username: '',
       telegramChatId: '',
       email: '',
+      password: '',
       roles: '[VIEWER]',
+      permissions: '',
+      ip_whitelist: '',
+      resource_whitelist: '',
+      allowed_payment_names: '',
       active: true,
     });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (editingUserId) {
       // Обновление существующего пользователя
       setUsers((prevUsers) =>
@@ -719,22 +734,69 @@ export const UsersPage = () => {
         )
       );
       console.log('Update user', editingUserId, newUser);
+      handleCloseCreate();
     } else {
-      // Создание нового пользователя
-      const newId = Math.max(...users.map((u) => u.id), 0) + 1;
-      const createdUser = {
-        id: newId,
-        username: newUser.username,
-        telegramChatId: newUser.telegramChatId,
-        email: newUser.email,
-        roles: newUser.roles,
-        active: newUser.active,
-        createdAt: new Date().toISOString().slice(0, 19).replace('T', ' '),
-      };
-      setUsers((prevUsers) => [...prevUsers, createdUser]);
-      console.log('Create new user', createdUser);
+      // Создание нового пользователя через API
+      try {
+        const token = getCookie('rb_admin_token');
+        const headers = {
+          'Content-Type': 'application/json',
+        };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        // Преобразуем roles из строки [VIEWER] в массив ["VIEWER"]
+        const rolesArray = newUser.roles
+          .replace(/[\[\]]/g, '')
+          .split(',')
+          .map(role => role.trim())
+          .filter(role => role);
+
+        // Преобразуем строки с запятыми в массивы
+        const parseArray = (str) => {
+          if (!str || !str.trim()) return [];
+          return str.split(',').map(item => item.trim()).filter(item => item);
+        };
+
+        const requestBody = {
+          username: newUser.username,
+          email: newUser.email,
+          password: newUser.password || 'defaultPassword123', // Если пароль не указан, используем дефолтный
+          roles: rolesArray,
+          permissions: parseArray(newUser.permissions),
+          ip_whitelist: parseArray(newUser.ip_whitelist),
+          resource_whitelist: parseArray(newUser.resource_whitelist),
+          allowed_payment_names: parseArray(newUser.allowed_payment_names),
+        };
+
+        const response = await fetch('https://repayment.cat-tools.com/api/v1/admin/users', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(requestBody),
+        });
+
+        if (response.status === 401) {
+          alert('Ошибка авторизации');
+          return;
+        }
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+
+        const createdUser = await response.json();
+        console.log('User created successfully', createdUser);
+        
+        // Обновляем список пользователей
+        await fetchUsers();
+        handleCloseCreate();
+      } catch (err) {
+        console.error('Ошибка при создании пользователя:', err);
+        alert(`Ошибка при создании пользователя: ${err.message}`);
+      }
     }
-    handleCloseCreate();
   };
 
   const handleView = (user, e) => {
@@ -759,11 +821,45 @@ export const UsersPage = () => {
     }
   };
 
-  const handleDelete = (userId, e) => {
+  const handleDelete = async (userId, e) => {
     e.stopPropagation();
     if (window.confirm('Are you sure you want to delete this user?')) {
-      setUsers((prevUsers) => prevUsers.filter((user) => user.id !== userId));
-      console.log('Delete user', userId);
+      try {
+        const token = getCookie('rb_admin_token');
+        const headers = {
+          'Content-Type': 'application/json',
+        };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        // Получаем _id пользователя для API запроса
+        const user = users.find((u) => u.id === userId);
+        const userApiId = user?._id || user?.id || userId;
+
+        const response = await fetch(`https://repayment.cat-tools.com/api/v1/admin/users/${userApiId}`, {
+          method: 'DELETE',
+          headers,
+        });
+
+        if (response.status === 401) {
+          alert('Ошибка авторизации');
+          return;
+        }
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+
+        console.log('User deleted successfully', userApiId);
+        
+        // Обновляем список пользователей
+        await fetchUsers();
+      } catch (err) {
+        console.error('Ошибка при удалении пользователя:', err);
+        alert(`Ошибка при удалении пользователя: ${err.message}`);
+      }
     }
   };
 
@@ -969,6 +1065,23 @@ export const UsersPage = () => {
                   </SettingContent>
                 </SettingSection>
 
+                {!editingUserId && (
+                  <SettingSection>
+                    <SettingLabel theme={theme}>Password</SettingLabel>
+                    <SettingContent>
+                      <TextInput
+                        theme={theme}
+                        type="password"
+                        value={newUser.password}
+                        onChange={(e) =>
+                          setNewUser({ ...newUser, password: e.target.value })
+                        }
+                        placeholder="Enter password..."
+                      />
+                    </SettingContent>
+                  </SettingSection>
+                )}
+
                 <SettingSection>
                   <SettingLabel theme={theme}>Roles</SettingLabel>
                   <SettingContent>
@@ -985,6 +1098,70 @@ export const UsersPage = () => {
                     </Select>
                   </SettingContent>
                 </SettingSection>
+
+                {!editingUserId && (
+                  <>
+                    <SettingSection>
+                      <SettingLabel theme={theme}>Permissions</SettingLabel>
+                      <SettingContent>
+                        <TextInput
+                          theme={theme}
+                          type="text"
+                          value={newUser.permissions}
+                          onChange={(e) =>
+                            setNewUser({ ...newUser, permissions: e.target.value })
+                          }
+                          placeholder="Comma-separated permissions..."
+                        />
+                      </SettingContent>
+                    </SettingSection>
+
+                    <SettingSection>
+                      <SettingLabel theme={theme}>IP Whitelist</SettingLabel>
+                      <SettingContent>
+                        <TextInput
+                          theme={theme}
+                          type="text"
+                          value={newUser.ip_whitelist}
+                          onChange={(e) =>
+                            setNewUser({ ...newUser, ip_whitelist: e.target.value })
+                          }
+                          placeholder="Comma-separated IP addresses..."
+                        />
+                      </SettingContent>
+                    </SettingSection>
+
+                    <SettingSection>
+                      <SettingLabel theme={theme}>Resource Whitelist</SettingLabel>
+                      <SettingContent>
+                        <TextInput
+                          theme={theme}
+                          type="text"
+                          value={newUser.resource_whitelist}
+                          onChange={(e) =>
+                            setNewUser({ ...newUser, resource_whitelist: e.target.value })
+                          }
+                          placeholder="Comma-separated resources..."
+                        />
+                      </SettingContent>
+                    </SettingSection>
+
+                    <SettingSection>
+                      <SettingLabel theme={theme}>Allowed Payment Names</SettingLabel>
+                      <SettingContent>
+                        <TextInput
+                          theme={theme}
+                          type="text"
+                          value={newUser.allowed_payment_names}
+                          onChange={(e) =>
+                            setNewUser({ ...newUser, allowed_payment_names: e.target.value })
+                          }
+                          placeholder="Comma-separated payment names..."
+                        />
+                      </SettingContent>
+                    </SettingSection>
+                  </>
+                )}
 
                 <SettingSection>
                   <SettingLabel theme={theme}>Active</SettingLabel>

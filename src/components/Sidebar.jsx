@@ -133,7 +133,6 @@ const menuItems = [
   { label: 'Playground', path: '/playground' },
   { label: 'System', path: '/system' },
   { label: 'Telegram Tools', path: '/telegram-tools' },
-  { label: 'OpenAI Stats', path: '/openai-stats' },
 ];
 
 const models = [

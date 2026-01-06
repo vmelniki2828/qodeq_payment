@@ -3,7 +3,16 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import styled, { ThemeProvider } from 'styled-components';
 import { useTheme } from '../contexts/ThemeContext';
 import { Layout } from '../components/Layout';
+import { Loader } from '../components/Loader';
 import { HiArrowPath, HiPencil, HiTrash, HiUserCircle, HiChevronLeft } from 'react-icons/hi2';
+
+// Функция для получения токена из куки
+const getCookie = (name) => {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
+};
 
 // Функция для форматирования даты
 const formatDate = (dateString) => {
@@ -247,20 +256,72 @@ export const UserDetailPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [user, setUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchUserData = async (userId) => {
+    setIsLoading(true);
+    try {
+      const token = getCookie('rb_admin_token');
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`https://repayment.cat-tools.com/api/v1/admin/resources/user/${userId}`, {
+        method: 'GET',
+        headers,
+      });
+
+      if (response.status === 401) {
+        setUser(null);
+        setIsLoading(false);
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setUser(data);
+    } catch (err) {
+      console.error('Ошибка при загрузке данных пользователя:', err);
+      // Если запрос не удался, используем данные из location.state как fallback
+      if (location.state?.userData) {
+        setUser(location.state.userData);
+      } else {
+        setUser(null);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // Используем данные, переданные через навигацию
-    if (location.state?.userData) {
-      setUser(location.state.userData);
+    // Определяем ID для запроса: используем _id из location.state или ID из URL
+    const userId = location.state?.userData?._id || id;
+    
+    if (userId) {
+      fetchUserData(userId);
     } else {
-      // Если данные не переданы, показываем сообщение об ошибке
-      setUser(null);
+      // Если нет ID, используем данные из location.state
+      if (location.state?.userData) {
+        setUser(location.state.userData);
+      } else {
+        setUser(null);
+      }
+      setIsLoading(false);
     }
-  }, [location.state, id]);
+  }, [id, location.state]);
 
   const handleRefresh = () => {
-    // Возвращаемся к списку для обновления данных
-    navigate('/models/users');
+    const userId = user?._id || id;
+    if (userId) {
+      fetchUserData(userId);
+    }
   };
 
   const handleEdit = () => {
@@ -279,13 +340,29 @@ export const UserDetailPage = () => {
     navigate('/models/users');
   };
 
+  if (isLoading) {
+    return (
+      <Layout>
+        <ThemeProvider theme={theme}>
+          <PageContent>
+            <ContentWrapper>
+              <Loader />
+            </ContentWrapper>
+          </PageContent>
+        </ThemeProvider>
+      </Layout>
+    );
+  }
+
   if (!user) {
     return (
       <Layout>
         <ThemeProvider theme={theme}>
           <PageContent>
             <ContentWrapper>
-              <div>Пользователь не найден</div>
+              <div style={{ padding: '20px', textAlign: 'center', color: theme.colors.secondary }}>
+                Пользователь не найден
+              </div>
             </ContentWrapper>
           </PageContent>
         </ThemeProvider>
