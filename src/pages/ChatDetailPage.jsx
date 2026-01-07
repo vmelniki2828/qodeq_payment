@@ -1,9 +1,37 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import styled, { ThemeProvider } from 'styled-components';
 import { useTheme } from '../contexts/ThemeContext';
 import { Layout } from '../components/Layout';
+import { Loader } from '../components/Loader';
 import { HiArrowPath, HiPencil, HiTrash, HiChevronLeft } from 'react-icons/hi2';
+
+// Функция для получения токена из куки
+const getCookie = (name) => {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
+};
+
+// Функция для форматирования даты
+const formatDate = (dateString) => {
+  if (!dateString) return '';
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+    return date.toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }).replace(',', '');
+  } catch (e) {
+    return dateString;
+  }
+};
 
 const PageContent = styled.div`
   height: 100%;
@@ -197,46 +225,78 @@ const IdValue = styled.span`
   cursor: pointer;
 `;
 
-// Моковые данные chats
-const mockChats = [
-  {
-    id: 1,
-    _id: '692ef62e69b12babcd7522b1',
-    payment: 'hgategelato',
-    chatId: '-2439134796',
-    operators: [342926003, 8250662366, 330162182, 351516779, 110345101, 7337175521, 969997649, 7535676711, 7852716369, 7856284707, 323718363, 8258611696, 5255314681, 7946413946],
-    template: 'with_file',
-    extraText: null,
-    createdAt: '2025-12-02 14:22:38',
-    updatedAt: '2025-12-02 14:22:38',
-  },
-  {
-    id: 2,
-    _id: '692ef62e69b12babcd7522b2',
-    payment: '1pat',
-    chatId: '-4979836069',
-    operators: [7755983628, 7646979697, 7504629166, 7626314980, 8077361366, 7483660988],
-    template: 'with_url',
-    extraText: null,
-    createdAt: '2025-12-02 13:57:45',
-    updatedAt: '2025-12-02 13:57:45',
-  },
-];
-
 export const ChatDetailPage = () => {
   const { theme } = useTheme();
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [chat, setChat] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchChatData = async (chatId) => {
+    setIsLoading(true);
+    try {
+      const token = getCookie('rb_admin_token');
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`https://repayment.cat-tools.com/api/v1/admin/resources/chat/${chatId}`, {
+        method: 'GET',
+        headers,
+      });
+
+      if (response.status === 401) {
+        setChat(null);
+        setIsLoading(false);
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setChat(data);
+    } catch (err) {
+      console.error('Ошибка при загрузке данных чата:', err);
+      // Если запрос не удался, используем данные из location.state как fallback
+      if (location.state?.chatData) {
+        setChat(location.state.chatData);
+      } else {
+        setChat(null);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // Находим chat по ID
-    const foundChat = mockChats.find((c) => c.id === Number(id) || c._id === id);
-    setChat(foundChat || null);
-  }, [id]);
+    // Определяем ID для запроса: используем _id из location.state или ID из URL
+    const chatId = location.state?.chatData?._id || id;
+    
+    if (chatId) {
+      fetchChatData(chatId);
+    } else {
+      // Если нет ID, используем данные из location.state
+      if (location.state?.chatData) {
+        setChat(location.state.chatData);
+      } else {
+        setChat(null);
+      }
+      setIsLoading(false);
+    }
+  }, [id, location.state]);
 
   const handleRefresh = () => {
-    console.log('Refresh chat', id);
+    const chatId = chat?._id || id;
+    if (chatId) {
+      fetchChatData(chatId);
+    }
   };
 
   const handleEdit = () => {
@@ -258,14 +318,32 @@ export const ChatDetailPage = () => {
     navigator.clipboard.writeText(text);
   };
 
+  if (isLoading) {
+    return (
+      <Layout>
+        <ThemeProvider theme={theme}>
+          <PageContent>
+            <ContentWrapper>
+              <Loader />
+            </ContentWrapper>
+          </PageContent>
+        </ThemeProvider>
+      </Layout>
+    );
+  }
+
   if (!chat) {
     return (
       <Layout>
-        <PageContent>
-          <ContentWrapper>
-            <div>Chat not found</div>
-          </ContentWrapper>
-        </PageContent>
+        <ThemeProvider theme={theme}>
+          <PageContent>
+            <ContentWrapper>
+              <div style={{ padding: '20px', textAlign: 'center', color: theme.colors.secondary }}>
+                Чат не найден
+              </div>
+            </ContentWrapper>
+          </PageContent>
+        </ThemeProvider>
       </Layout>
     );
   }
@@ -275,24 +353,26 @@ export const ChatDetailPage = () => {
       return '—';
     }
     if (Array.isArray(value)) {
-      return `[${value.join(', ')}]`;
+      return value.length > 0 ? JSON.stringify(value) : '[]';
     }
     if (typeof value === 'boolean') {
       return value.toString();
     }
+    if (typeof value === 'object') {
+      return JSON.stringify(value, null, 2);
+    }
     return String(value);
   };
 
-  const fields = [
-    { field: '_id', value: chat._id },
-    { field: 'created_at', value: chat.createdAt },
-    { field: 'updated_at', value: chat.updatedAt },
-    { field: 'chat_id', value: chat.chatId },
-    { field: 'payment_name', value: chat.payment },
-    { field: 'payment_operator_ids', value: chat.operators },
-    { field: 'message_template', value: chat.template },
-    { field: 'extra_text', value: chat.extraText },
-  ];
+  // Формируем список всех полей чата для отображения
+  const fields = Object.keys(chat).map((key) => {
+    let value = chat[key];
+    // Форматируем даты
+    if (key === 'created_at' || key === 'updated_at' || key === 'createdAt' || key === 'updatedAt') {
+      value = formatDate(value);
+    }
+    return { field: key, value };
+  });
 
   return (
     <Layout>
@@ -300,7 +380,7 @@ export const ChatDetailPage = () => {
         <PageContent>
           <HeaderSection theme={theme}>
             <Title theme={theme}>
-              Chats · {chat._id}
+              Chats · {chat._id || chat.id || id}
             </Title>
             <ButtonsGroup>
               <Button theme={theme} onClick={handleRefresh}>
@@ -328,23 +408,25 @@ export const ChatDetailPage = () => {
               <ChatGrid>
                 <ChatItem>
                   <ChatLabel theme={theme}>Payment</ChatLabel>
-                  <ChatValue theme={theme}>{chat.payment}</ChatValue>
+                  <ChatValue theme={theme}>{chat.payment || chat.payment_name || '—'}</ChatValue>
                 </ChatItem>
                 <ChatItem>
                   <ChatLabel theme={theme}>Operators</ChatLabel>
                   <ChatValue theme={theme} $monospace>
-                    {chat.operators.join(', ')}
+                    {Array.isArray(chat.payment_operator_ids || chat.operators) 
+                      ? (chat.payment_operator_ids || chat.operators).join(', ')
+                      : '—'}
                   </ChatValue>
                 </ChatItem>
                 <ChatItem>
                   <ChatLabel theme={theme}>Chat ID</ChatLabel>
                   <ChatValue theme={theme} $monospace>
-                    {chat.chatId}
+                    {chat.chat_id || chat.chatId || '—'}
                   </ChatValue>
                 </ChatItem>
                 <ChatItem>
                   <ChatLabel theme={theme}>Template</ChatLabel>
-                  <ChatValue theme={theme}>{chat.template}</ChatValue>
+                  <ChatValue theme={theme}>{chat.template || chat.message_template || '—'}</ChatValue>
                 </ChatItem>
               </ChatGrid>
             </ChatSection>
@@ -361,10 +443,18 @@ export const ChatDetailPage = () => {
                   <TableRow key={index} theme={theme}>
                     <FieldCell theme={theme}>{item.field}</FieldCell>
                     <ValueCell theme={theme}>
-                      {item.field === '_id' ? (
+                      {item.field === '_id' || item.field === 'id' ? (
                         <IdValue onClick={() => handleCopyId(item.value)}>
                           {formatValue(item.value)}
                         </IdValue>
+                      ) : (item.field === 'chat_id' || item.field === 'chatId') && item.value ? (
+                        <IdValue onClick={() => handleCopyId(item.value)}>
+                          {formatValue(item.value)}
+                        </IdValue>
+                      ) : typeof item.value === 'object' && item.value !== null ? (
+                        <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>
+                          {formatValue(item.value)}
+                        </pre>
                       ) : (
                         formatValue(item.value)
                       )}

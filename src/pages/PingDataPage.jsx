@@ -1,9 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled, { ThemeProvider } from 'styled-components';
 import { useTheme } from '../contexts/ThemeContext';
 import { Layout } from '../components/Layout';
+import { Loader } from '../components/Loader';
+import { Pagination } from '../components/Pagination';
 import { HiPencil, HiTrash, HiArrowUp, HiArrowDown, HiEye, HiChevronLeft } from 'react-icons/hi2';
+
+// Функция для получения токена из куки
+const getCookie = (name) => {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
+};
 
 const HeaderSection = styled.div`
   display: flex;
@@ -450,247 +460,17 @@ const ActionButton = styled.button`
   `}
 `;
 
-const PaginationSection = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px;
-  border-top: 1px solid ${({ theme }) => theme.colors.border};
-`;
-
-const TotalText = styled.span`
-  font-size: 14px;
-  color: ${({ theme }) => theme.colors.secondary};
-`;
-
-const PaginationInfo = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 16px;
-`;
-
-const PaginationText = styled.span`
-  font-size: 14px;
-  color: ${({ theme }) => theme.colors.secondary};
-`;
-
-const PaginationButtons = styled.div`
-  display: flex;
-  gap: 8px;
-`;
-
-const PaginationButton = styled.button`
-  padding: 6px 12px;
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 6px;
-  background-color: ${({ theme }) => theme.colors.background};
-  color: ${({ theme }) => theme.colors.primary};
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-
-  &:hover:not(:disabled) {
-    background-color: ${({ theme }) =>
-      theme.colors.primary === '#0D0D0D'
-        ? '#f0f0f0'
-        : 'rgba(255,255,255,0.08)'};
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  ${({ $active }) =>
-    $active &&
-    `
-    background-color: ${({ theme }) => theme.colors.accent};
-    color: #FFFFFF;
-    border-color: ${({ theme }) => theme.colors.accent};
-    
-    &:hover {
-      background-color: ${({ theme }) => theme.colors.accentHover || theme.colors.accent};
-    }
-  `}
-`;
-
-// Моковые данные ping data
-const mockPingData = [
-  {
-    id: 1,
-    _id: '692ec5e77d6f683171fc0c70',
-    ticketId: 'bd40f1d6-8071-469c-9189-39791c1b8ab1',
-    payment: '',
-    externalId: '5589865',
-    valid: false,
-    reason: 'missing transaction id in payment response',
-    waitForClient: false,
-    hasBlockingRequests: false,
-    cooldownMinutes: null,
-    usage: {
-      input_tokens: 1529,
-      cache_write_tokens: 0,
-      cache_read_tokens: 0,
-      output_tokens: 74,
-      input_audio_tokens: 0,
-      cache_audio_read_tokens: 0,
-      output_audio_tokens: 0,
-      details: {
-        accepted_prediction_tokens: 0,
-        audio_tokens: 0,
-        reasoning_tokens: 0,
-        rejected_prediction_tokens: 0,
-      },
-      requests: 1,
-    },
-    createdAt: '2025-12-02 10:56:39',
-    updatedAt: '2025-12-02 10:56:39',
-  },
-  {
-    id: 2,
-    _id: '692ec5e77d6f683171fc0c71',
-    ticketId: 'd70c180b-bdf5-47c4-a8e0-98f4ebb66242',
-    payment: '',
-    externalId: '5165784',
-    valid: false,
-    reason: 'missing transaction id',
-    waitForClient: false,
-    hasBlockingRequests: false,
-    cooldownMinutes: null,
-    usage: null,
-    createdAt: '2025-12-02 10:56:38',
-    updatedAt: '2025-12-02 10:56:38',
-  },
-  {
-    id: 3,
-    _id: '692ec5e77d6f683171fc0c72',
-    ticketId: '97ed1dab-307d-4b57-95fe-3026715cfb66',
-    payment: '',
-    externalId: '10759070',
-    valid: false,
-    reason: 'missing transaction id',
-    waitForClient: false,
-    hasBlockingRequests: false,
-    cooldownMinutes: null,
-    usage: null,
-    createdAt: '2025-12-02 10:56:38',
-    updatedAt: '2025-12-02 10:56:38',
-  },
-  {
-    id: 4,
-    _id: '692ec5e77d6f683171fc0c73',
-    ticketId: '383170b1-e709-426b-8d90-45da4b174ac2',
-    payment: '',
-    externalId: '1603097546',
-    valid: false,
-    reason: 'missing transaction id',
-    waitForClient: false,
-    hasBlockingRequests: false,
-    cooldownMinutes: null,
-    usage: null,
-    createdAt: '2025-12-02 10:56:38',
-    updatedAt: '2025-12-02 10:56:38',
-  },
-  {
-    id: 5,
-    _id: '692ec5e77d6f683171fc0c74',
-    ticketId: '9e96a915-7cf5-4c7d-aaaa-adcece12738e',
-    payment: 'kauriavr',
-    externalId: '10794511',
-    valid: false,
-    reason: 'waiting for client statement (bank statement requested)',
-    waitForClient: true,
-    hasBlockingRequests: false,
-    cooldownMinutes: null,
-    usage: null,
-    createdAt: '2025-12-02 10:56:36',
-    updatedAt: '2025-12-02 10:56:36',
-  },
-  {
-    id: 6,
-    _id: '692ec5e77d6f683171fc0c75',
-    ticketId: 'ebb8c7ac-953d-4c75-b2b5-fae3a675a34f',
-    payment: '',
-    externalId: '3022457734',
-    valid: false,
-    reason: 'missing transaction id',
-    waitForClient: false,
-    hasBlockingRequests: false,
-    cooldownMinutes: null,
-    usage: null,
-    createdAt: '2025-12-02 10:56:36',
-    updatedAt: '2025-12-02 10:56:36',
-  },
-  {
-    id: 7,
-    _id: '692ec5e77d6f683171fc0c76',
-    ticketId: 'b9467b09-32dc-469d-91f9-7598326a1bf1',
-    payment: 'trustpay',
-    externalId: '10962289',
-    valid: true,
-    reason: 'Ticket is pending with no blocking requests or client wait; external_id found and payment_name matched.',
-    waitForClient: false,
-    hasBlockingRequests: false,
-    cooldownMinutes: null,
-    usage: null,
-    createdAt: '2025-12-02 10:56:36',
-    updatedAt: '2025-12-02 10:56:36',
-  },
-  {
-    id: 8,
-    _id: '692ec5e77d6f683171fc0c77',
-    ticketId: '6084bbd9-e046-4313-a416-eb828f9fc3b1',
-    payment: '',
-    externalId: '11265640',
-    valid: true,
-    reason: 'Ticket is pending, no blocking requests or client wait detected, external_id found',
-    waitForClient: false,
-    hasBlockingRequests: false,
-    cooldownMinutes: null,
-    usage: null,
-    createdAt: '2025-12-02 10:56:36',
-    updatedAt: '2025-12-02 10:56:36',
-  },
-  {
-    id: 9,
-    _id: '692ec5e77d6f683171fc0c78',
-    ticketId: '9b19b3d6-0fca-499d-a24a-3fbbbd4ba226',
-    payment: '',
-    externalId: '11145400',
-    valid: false,
-    reason: 'missing transaction id',
-    waitForClient: false,
-    hasBlockingRequests: false,
-    cooldownMinutes: null,
-    usage: null,
-    createdAt: '2025-12-02 10:56:36',
-    updatedAt: '2025-12-02 10:56:36',
-  },
-  {
-    id: 10,
-    _id: '692ec5e77d6f683171fc0c79',
-    ticketId: 'cc412488-b23f-473a-911e-1154a31e4349',
-    payment: '',
-    externalId: 's17bea3c7-e183-4239-84c4-d8499cb02aa3a',
-    valid: false,
-    reason: 'missing transaction id',
-    waitForClient: false,
-    hasBlockingRequests: false,
-    cooldownMinutes: null,
-    usage: null,
-    createdAt: '2025-12-02 10:56:35',
-    updatedAt: '2025-12-02 10:56:35',
-  },
-];
 
 export const PingDataPage = () => {
   const { theme } = useTheme();
   const navigate = useNavigate();
-  const [pingData, setPingData] = useState(mockPingData);
+  const [pingData, setPingData] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState('created_at');
   const [sortDirection, setSortDirection] = useState('desc');
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingPingDataId, setEditingPingDataId] = useState(null);
   const [newPingData, setNewPingData] = useState({
@@ -700,6 +480,84 @@ export const PingDataPage = () => {
     valid: false,
     reason: '',
   });
+
+  // Загрузка данных из API
+  const fetchPingData = async () => {
+    setIsLoading(true);
+    try {
+      const token = getCookie('rb_admin_token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        page_size: '20',
+        sort_by: sortField,
+        sort_dir: sortDirection,
+      });
+      
+      const response = await fetch(`https://repayment.cat-tools.com/api/v1/admin/resources/ping_data?${params}`, {
+        method: 'GET',
+        headers,
+      });
+      
+      if (response.status === 401) {
+        setPingData([]);
+        setIsLoading(false);
+        return;
+      }
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Обрабатываем ответ API (может быть объект с полями data, total, pages или массив)
+      let items = [];
+      let total = 0;
+      
+      if (Array.isArray(data)) {
+        items = data;
+        total = data.length;
+      } else if (data.data && Array.isArray(data.data)) {
+        items = data.data;
+        total = data.total || data.count || items.length;
+      } else if (data.items && Array.isArray(data.items)) {
+        items = data.items;
+        total = data.total || data.count || items.length;
+      }
+      
+      // Преобразуем данные API в формат, который ожидает компонент
+      const formattedPingData = items.map((item, index) => ({
+        id: item.id || item._id || index + 1,
+        _id: item._id || item.id || `ping_${index}`,
+        ticketId: item.ticket_id || item.ticketId || '',
+        payment: item.payment || '',
+        externalId: item.external_id || item.externalId || '',
+        valid: item.valid !== undefined ? item.valid : false,
+        reason: item.reason || '',
+        createdAt: item.created_at || item.createdAt || '',
+        updatedAt: item.updated_at || item.updatedAt || '',
+      }));
+      
+      setPingData(formattedPingData);
+      setTotalPages(Math.ceil(total / 20) || 1);
+    } catch (err) {
+      console.error('Ошибка при загрузке ping data:', err);
+      setPingData([]);
+      setTotalPages(1);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPingData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, sortField, sortDirection]);
 
   const filteredPingData = pingData.filter((item) => {
     const matchesSearch =
@@ -752,11 +610,13 @@ export const PingDataPage = () => {
 
   const handleSort = (field) => {
     if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+      const newDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+      setSortDirection(newDirection);
     } else {
       setSortField(field);
       setSortDirection('asc');
     }
+    setCurrentPage(1); // Сбрасываем на первую страницу при изменении сортировки
   };
 
   const getSortIcon = (field) => {
@@ -765,7 +625,7 @@ export const PingDataPage = () => {
   };
 
   const handleRefresh = () => {
-    console.log('Refresh ping data');
+    fetchPingData();
   };
 
   const handleCreate = () => {
@@ -830,7 +690,10 @@ export const PingDataPage = () => {
 
   const handleView = (pingDataId, e) => {
     e?.stopPropagation();
-    navigate(`/models/ping-data/${pingDataId}`);
+    // Находим элемент по id и используем _id для навигации
+    const item = pingData.find((p) => p.id === pingDataId);
+    const pingDataIdToUse = item?._id || pingDataId;
+    navigate(`/models/ping-data/${pingDataIdToUse}`);
   };
 
   const handleEdit = (pingDataId, e) => {
@@ -857,12 +720,29 @@ export const PingDataPage = () => {
     }
   };
 
-  const ITEMS_PER_PAGE = 10;
-  const totalPingData = sortedPingData.length;
-  const totalPages = Math.ceil(totalPingData / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const endIndex = startIndex + ITEMS_PER_PAGE;
-  const paginatedPingData = sortedPingData.slice(startIndex, endIndex);
+  // Используем отфильтрованные данные (поиск работает на клиенте)
+  const displayData = filteredPingData;
+  const totalDisplayData = filteredPingData.length;
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <ThemeProvider theme={theme}>
+          <div
+            style={{
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <Loader />
+          </div>
+        </ThemeProvider>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -980,7 +860,7 @@ export const PingDataPage = () => {
                     </TableHeaderRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedPingData.map((item) => (
+                    {displayData.map((item) => (
                       <TableRow key={item.id} theme={theme}>
                         <TicketIdCell theme={theme}>{item.ticketId}</TicketIdCell>
                         <PaymentCell theme={theme}>{item.payment || ''}</PaymentCell>
@@ -1100,40 +980,13 @@ export const PingDataPage = () => {
             </RightPanel>
           </PageContainer>
 
-          <PaginationSection theme={theme}>
-            <TotalText theme={theme}>Total: {totalPingData}</TotalText>
-            <PaginationInfo>
-              <PaginationText theme={theme}>
-                Page {currentPage} of {totalPages} • Total {totalPingData}
-              </PaginationText>
-              <PaginationButtons>
-                <PaginationButton
-                  theme={theme}
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                >
-                  Prev
-                </PaginationButton>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <PaginationButton
-                    key={page}
-                    theme={theme}
-                    $active={currentPage === page}
-                    onClick={() => setCurrentPage(page)}
-                  >
-                    {page}
-                  </PaginationButton>
-                ))}
-                <PaginationButton
-                  theme={theme}
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                >
-                  Next
-                </PaginationButton>
-              </PaginationButtons>
-            </PaginationInfo>
-          </PaginationSection>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalDisplayData}
+            onPageChange={setCurrentPage}
+            itemsPerPage={20}
+          />
         </div>
       </ThemeProvider>
     </Layout>

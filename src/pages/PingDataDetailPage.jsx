@@ -1,9 +1,37 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import styled, { ThemeProvider } from 'styled-components';
 import { useTheme } from '../contexts/ThemeContext';
 import { Layout } from '../components/Layout';
+import { Loader } from '../components/Loader';
 import { HiArrowPath, HiPencil, HiTrash, HiChevronLeft } from 'react-icons/hi2';
+
+// Функция для получения токена из куки
+const getCookie = (name) => {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
+};
+
+// Функция для форматирования даты
+const formatDate = (dateString) => {
+  if (!dateString) return '';
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+    return date.toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }).replace(',', '');
+  } catch (e) {
+    return dateString;
+  }
+};
 
 const PageContent = styled.div`
   height: 100%;
@@ -168,69 +196,78 @@ const JsonValue = styled.pre`
   color: ${({ theme }) => theme.colors.primary};
 `;
 
-// Моковые данные ping data
-const mockPingData = [
-  {
-    id: 1,
-    _id: '692ec5e77d6f683171fc0c70',
-    ticketId: 'bd40f1d6-8071-469c-9189-39791c1b8ab1',
-    payment: '',
-    externalId: '5589865',
-    valid: false,
-    reason: 'missing transaction id in payment response',
-    waitForClient: false,
-    hasBlockingRequests: false,
-    cooldownMinutes: null,
-    usage: {
-      input_tokens: 1529,
-      cache_write_tokens: 0,
-      cache_read_tokens: 0,
-      output_tokens: 74,
-      input_audio_tokens: 0,
-      cache_audio_read_tokens: 0,
-      output_audio_tokens: 0,
-      details: {
-        accepted_prediction_tokens: 0,
-        audio_tokens: 0,
-        reasoning_tokens: 0,
-        rejected_prediction_tokens: 0,
-      },
-      requests: 1,
-    },
-    createdAt: '2025-12-02 10:56:39',
-    updatedAt: '2025-12-02 10:56:39',
-  },
-  {
-    id: 2,
-    _id: '692ec5e77d6f683171fc0c71',
-    ticketId: 'd70c180b-bdf5-47c4-a8e0-98f4ebb66242',
-    payment: '',
-    externalId: '5165784',
-    valid: false,
-    reason: 'missing transaction id',
-    waitForClient: false,
-    hasBlockingRequests: false,
-    cooldownMinutes: null,
-    usage: null,
-    createdAt: '2025-12-02 10:56:38',
-    updatedAt: '2025-12-02 10:56:38',
-  },
-];
-
 export const PingDataDetailPage = () => {
   const { theme } = useTheme();
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [pingData, setPingData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchPingData = async (pingDataId) => {
+    setIsLoading(true);
+    try {
+      const token = getCookie('rb_admin_token');
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`https://repayment.cat-tools.com/api/v1/admin/resources/ping_data/${pingDataId}`, {
+        method: 'GET',
+        headers,
+      });
+
+      if (response.status === 401) {
+        setPingData(null);
+        setIsLoading(false);
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setPingData(data);
+    } catch (err) {
+      console.error('Ошибка при загрузке данных ping data:', err);
+      // Если запрос не удался, используем данные из location.state как fallback
+      if (location.state?.pingData) {
+        setPingData(location.state.pingData);
+      } else {
+        setPingData(null);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // Находим ping data по ID
-    const foundPingData = mockPingData.find((p) => p.id === Number(id) || p._id === id);
-    setPingData(foundPingData || null);
-  }, [id]);
+    // Определяем ID для запроса: используем _id из location.state или ID из URL
+    const pingDataId = location.state?.pingData?._id || id;
+    
+    if (pingDataId) {
+      fetchPingData(pingDataId);
+    } else {
+      // Если нет ID, используем данные из location.state
+      if (location.state?.pingData) {
+        setPingData(location.state.pingData);
+      } else {
+        setPingData(null);
+      }
+      setIsLoading(false);
+    }
+  }, [id, location.state]);
 
   const handleRefresh = () => {
-    console.log('Refresh ping data', id);
+    const pingDataId = pingData?._id || id;
+    if (pingDataId) {
+      fetchPingData(pingDataId);
+    }
   };
 
   const handleEdit = () => {
@@ -252,14 +289,32 @@ export const PingDataDetailPage = () => {
     navigator.clipboard.writeText(text);
   };
 
+  if (isLoading) {
+    return (
+      <Layout>
+        <ThemeProvider theme={theme}>
+          <PageContent>
+            <ContentWrapper>
+              <Loader />
+            </ContentWrapper>
+          </PageContent>
+        </ThemeProvider>
+      </Layout>
+    );
+  }
+
   if (!pingData) {
     return (
       <Layout>
-        <PageContent>
-          <ContentWrapper>
-            <div>Ping data not found</div>
-          </ContentWrapper>
-        </PageContent>
+        <ThemeProvider theme={theme}>
+          <PageContent>
+            <ContentWrapper>
+              <div style={{ padding: '20px', textAlign: 'center', color: theme.colors.secondary }}>
+                Ping data не найдено
+              </div>
+            </ContentWrapper>
+          </PageContent>
+        </ThemeProvider>
       </Layout>
     );
   }
@@ -277,20 +332,15 @@ export const PingDataDetailPage = () => {
     return String(value);
   };
 
-  const fields = [
-    { field: '_id', value: pingData._id },
-    { field: 'created_at', value: pingData.createdAt },
-    { field: 'updated_at', value: pingData.updatedAt },
-    { field: 'ticket_id', value: pingData.ticketId },
-    { field: 'payment_name', value: pingData.payment },
-    { field: 'external_id', value: pingData.externalId },
-    { field: 'valid', value: pingData.valid },
-    { field: 'reason', value: pingData.reason },
-    { field: 'wait_for_client', value: pingData.waitForClient },
-    { field: 'has_blocking_requests', value: pingData.hasBlockingRequests },
-    { field: 'cooldown_minutes', value: pingData.cooldownMinutes },
-    { field: 'usage', value: pingData.usage },
-  ];
+  // Формируем список всех полей ping data для отображения
+  const fields = Object.keys(pingData).map((key) => {
+    let value = pingData[key];
+    // Форматируем даты
+    if (key === 'created_at' || key === 'updated_at' || key === 'createdAt' || key === 'updatedAt') {
+      value = formatDate(value);
+    }
+    return { field: key, value };
+  });
 
   return (
     <Layout>
@@ -298,7 +348,7 @@ export const PingDataDetailPage = () => {
         <PageContent>
           <HeaderSection theme={theme}>
             <Title theme={theme}>
-              Ping Data · {pingData._id}
+              Ping Data · {pingData._id || pingData.id || id}
             </Title>
             <ButtonsGroup>
               <Button theme={theme} onClick={handleRefresh}>
@@ -333,11 +383,11 @@ export const PingDataDetailPage = () => {
                   <TableRow key={index} theme={theme}>
                     <FieldCell theme={theme}>{item.field}</FieldCell>
                     <ValueCell theme={theme}>
-                      {item.field === '_id' ? (
+                      {item.field === '_id' || item.field === 'id' ? (
                         <IdValue onClick={() => handleCopyId(item.value)}>
                           {formatValue(item.value)}
                         </IdValue>
-                      ) : item.field === 'ticket_id' ? (
+                      ) : (item.field === 'ticket_id' || item.field === 'ticketId') && item.value ? (
                         <>
                           <IdValue onClick={() => handleCopyId(item.value)}>
                             {formatValue(item.value)}
@@ -346,11 +396,11 @@ export const PingDataDetailPage = () => {
                             Admin
                           </AdminLink>
                         </>
-                      ) : item.field === 'external_id' ? (
+                      ) : (item.field === 'external_id' || item.field === 'externalId') && item.value ? (
                         <IdValue onClick={() => handleCopyId(item.value)}>
                           {formatValue(item.value)}
                         </IdValue>
-                      ) : item.field === 'usage' && typeof item.value === 'object' ? (
+                      ) : typeof item.value === 'object' && item.value !== null ? (
                         <JsonValue theme={theme}>{formatValue(item.value)}</JsonValue>
                       ) : (
                         formatValue(item.value)

@@ -1,9 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled, { ThemeProvider } from 'styled-components';
 import { useTheme } from '../contexts/ThemeContext';
 import { Layout } from '../components/Layout';
+import { Loader } from '../components/Loader';
+import { Pagination } from '../components/Pagination';
 import { HiPencil, HiTrash, HiArrowUp, HiArrowDown, HiEye, HiChevronLeft } from 'react-icons/hi2';
+
+// Функция для получения токена из куки
+const getCookie = (name) => {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
+};
 
 const HeaderSection = styled.div`
   display: flex;
@@ -465,177 +475,12 @@ const ActionButton = styled.button`
   `}
 `;
 
-const PaginationSection = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px;
-  border-top: 1px solid ${({ theme }) => theme.colors.border};
-`;
-
-const TotalText = styled.span`
-  font-size: 14px;
-  color: ${({ theme }) => theme.colors.secondary};
-`;
-
-const PaginationInfo = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 16px;
-`;
-
-const PaginationText = styled.span`
-  font-size: 14px;
-  color: ${({ theme }) => theme.colors.secondary};
-`;
-
-const PaginationButtons = styled.div`
-  display: flex;
-  gap: 8px;
-`;
-
-const PaginationButton = styled.button`
-  padding: 6px 12px;
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 6px;
-  background-color: ${({ theme }) => theme.colors.background};
-  color: ${({ theme }) => theme.colors.primary};
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-
-  &:hover:not(:disabled) {
-    background-color: ${({ theme }) =>
-      theme.colors.primary === '#0D0D0D'
-        ? '#f0f0f0'
-        : 'rgba(255,255,255,0.08)'};
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  ${({ $active }) =>
-    $active &&
-    `
-    background-color: ${({ theme }) => theme.colors.accent};
-    color: #FFFFFF;
-    border-color: ${({ theme }) => theme.colors.accent};
-    
-    &:hover {
-      background-color: ${({ theme }) => theme.colors.accentHover || theme.colors.accent};
-    }
-  `}
-`;
-
-// Моковые данные chats
-const mockChats = [
-  {
-    id: 1,
-    _id: '692ef62e69b12babcd7522b1',
-    payment: 'hgategelato',
-    chatId: '-2439134796',
-    operators: [342926003, 8250662366, 330162182, 351516779, 110345101, 7337175521, 969997649, 7535676711, 7852716369, 7856284707, 323718363, 8258611696, 5255314681, 7946413946],
-    template: 'with_file',
-    extraText: null,
-    createdAt: '2025-12-02 14:22:38',
-    updatedAt: '2025-12-02 14:22:38',
-  },
-  {
-    id: 2,
-    _id: '692ef62e69b12babcd7522b2',
-    payment: '1pat',
-    chatId: '-4979836069',
-    operators: [7755983628, 7646979697, 7504629166, 7626314980, 8077361366, 7483660988],
-    template: 'with_url',
-    extraText: null,
-    createdAt: '2025-12-02 13:57:45',
-    updatedAt: '2025-12-02 13:57:45',
-  },
-  {
-    id: 3,
-    _id: '692ef62e69b12babcd7522b3',
-    payment: 'hgatesarexpay',
-    chatId: '-4926174290',
-    operators: [7904824798, 8328464329, 8462047787, 7728696804, 7661740997, 7558589031, 8177068240, 8346888510],
-    template: 'with_file',
-    extraText: null,
-    createdAt: '2025-12-02 13:46:17',
-    updatedAt: '2025-12-02 13:46:17',
-  },
-  {
-    id: 4,
-    _id: '692ef62e69b12babcd7522b4',
-    payment: 'hgatepropayller',
-    chatId: '-3293087967',
-    operators: [7850340112],
-    template: 'with_file',
-    extraText: null,
-    createdAt: '2025-12-02 11:55:54',
-    updatedAt: '2025-12-02 11:55:54',
-  },
-  {
-    id: 5,
-    _id: '692ef62e69b12babcd7522b5',
-    payment: 'hgateargospay',
-    chatId: '-1002949546189',
-    operators: [7875650588, 8306170891, 7972907222, 7316451611, 6385411126],
-    template: 'with_url',
-    extraText: null,
-    createdAt: '2025-11-04 11:06:21',
-    updatedAt: '2025-11-04 11:06:21',
-  },
-  {
-    id: 6,
-    _id: '692ef62e69b12babcd7522b6',
-    payment: 'hgateikra',
-    chatId: '-1002781372107',
-    operators: [7859501735, 7705927194, 7849363388, 8139060654, 7003395325],
-    template: 'with_url',
-    extraText: null,
-    createdAt: '2025-10-24 10:03:46',
-    updatedAt: '2025-10-24 10:03:46',
-  },
-  {
-    id: 7,
-    _id: '692ef62e69b12babcd7522b7',
-    payment: 'hgatetrustcloud',
-    chatId: '-1002542198462',
-    operators: [8133508268, 7821170663],
-    template: 'with_url',
-    extraText: null,
-    createdAt: '2025-10-24 08:23:28',
-    updatedAt: '2025-10-24 08:23:28',
-  },
-  {
-    id: 8,
-    _id: '692ef62e69b12babcd7522b8',
-    payment: 'hgatebigldea',
-    chatId: '-1003145259399',
-    operators: [1458435915, 6330236681, 1980528434, 5339874596, 5031661560, 1991017183, 7974602887],
-    template: 'with_url',
-    extraText: null,
-    createdAt: '2025-10-24 08:19:10',
-    updatedAt: '2025-10-24 08:19:10',
-  },
-  {
-    id: 9,
-    _id: '692ef62e69b12babcd7522b9',
-    payment: 'hgatepaytop',
-    chatId: '-1002851582464',
-    operators: [7757675453],
-    template: 'with_url',
-    extraText: null,
-    createdAt: '2025-10-22 09:11:06',
-    updatedAt: '2025-10-22 09:11:06',
-  },
-];
 
 export const ChatsPage = () => {
   const { theme } = useTheme();
   const navigate = useNavigate();
-  const [chats, setChats] = useState(mockChats);
+  const [chats, setChats] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState('created_at');
   const [sortDirection, setSortDirection] = useState('desc');
@@ -648,6 +493,70 @@ export const ChatsPage = () => {
     operators: '',
     template: 'with_file',
   });
+
+  // Загрузка данных из API
+  const fetchChats = async () => {
+    setIsLoading(true);
+    try {
+      const token = getCookie('rb_admin_token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const response = await fetch('https://repayment.cat-tools.com/api/v1/admin/chats', {
+        method: 'GET',
+        headers,
+      });
+      
+      if (response.status === 401) {
+        setChats([]);
+        setIsLoading(false);
+        return;
+      }
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Обрабатываем ответ API (может быть массив или объект с полями data, items)
+      let items = [];
+      
+      if (Array.isArray(data)) {
+        items = data;
+      } else if (data.data && Array.isArray(data.data)) {
+        items = data.data;
+      } else if (data.items && Array.isArray(data.items)) {
+        items = data.items;
+      }
+      
+      // Преобразуем данные API в формат, который ожидает компонент
+      const formattedChats = items.map((item, index) => ({
+        id: item.id || item._id || index + 1,
+        _id: item._id || item.id || `chat_${index}`,
+        payment: item.payment || item.payment_name || '',
+        chatId: item.chat_id || item.chatId || '',
+        operators: item.payment_operator_ids || item.operators || [],
+        template: item.template || '',
+        extraText: item.extra_text || item.extraText || null,
+        createdAt: item.created_at || item.createdAt || '',
+        updatedAt: item.updated_at || item.updatedAt || '',
+      }));
+      
+      setChats(formattedChats);
+    } catch (err) {
+      console.error('Ошибка при загрузке chats:', err);
+      setChats([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchChats();
+  }, []);
 
   const filteredChats = chats.filter((chat) => {
     const matchesSearch =
@@ -709,7 +618,7 @@ export const ChatsPage = () => {
   };
 
   const handleRefresh = () => {
-    console.log('Refresh chats');
+    fetchChats();
   };
 
   const handleCreate = () => {
@@ -776,7 +685,10 @@ export const ChatsPage = () => {
 
   const handleView = (chatId, e) => {
     e?.stopPropagation();
-    navigate(`/models/chats/${chatId}`);
+    // Находим элемент по id и используем _id для навигации
+    const item = chats.find((c) => c.id === chatId);
+    const chatIdToUse = item?._id || chatId;
+    navigate(`/models/chats/${chatIdToUse}`);
   };
 
   const handleEdit = (chatId, e) => {
@@ -808,6 +720,26 @@ export const ChatsPage = () => {
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = startIndex + ITEMS_PER_PAGE;
   const paginatedChats = sortedChats.slice(startIndex, endIndex);
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <ThemeProvider theme={theme}>
+          <div
+            style={{
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <Loader />
+          </div>
+        </ThemeProvider>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -1024,40 +956,13 @@ export const ChatsPage = () => {
             </RightPanel>
           </PageContainer>
 
-          <PaginationSection theme={theme}>
-            <TotalText theme={theme}>Total: {totalChats}</TotalText>
-            <PaginationInfo>
-              <PaginationText theme={theme}>
-                Page {currentPage} of {totalPages} • Total {totalChats}
-              </PaginationText>
-              <PaginationButtons>
-                <PaginationButton
-                  theme={theme}
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                >
-                  Prev
-                </PaginationButton>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <PaginationButton
-                    key={page}
-                    theme={theme}
-                    $active={currentPage === page}
-                    onClick={() => setCurrentPage(page)}
-                  >
-                    {page}
-                  </PaginationButton>
-                ))}
-                <PaginationButton
-                  theme={theme}
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                >
-                  Next
-                </PaginationButton>
-              </PaginationButtons>
-            </PaginationInfo>
-          </PaginationSection>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalChats}
+            onPageChange={setCurrentPage}
+            itemsPerPage={10}
+          />
         </div>
       </ThemeProvider>
     </Layout>

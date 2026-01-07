@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import styled, { ThemeProvider } from 'styled-components';
 import { useTheme } from '../contexts/ThemeContext';
 import { Layout } from '../components/Layout';
+import { Pagination } from '../components/Pagination';
 import { HiPencil, HiTrash, HiArrowUp, HiArrowDown, HiEye, HiChevronLeft } from 'react-icons/hi2';
 
 const HeaderSection = styled.div`
@@ -441,69 +442,6 @@ const ActionButton = styled.button`
   `}
 `;
 
-const PaginationSection = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px;
-  border-top: 1px solid ${({ theme }) => theme.colors.border};
-`;
-
-const TotalText = styled.span`
-  font-size: 14px;
-  color: ${({ theme }) => theme.colors.secondary};
-`;
-
-const PaginationInfo = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 16px;
-`;
-
-const PaginationText = styled.span`
-  font-size: 14px;
-  color: ${({ theme }) => theme.colors.secondary};
-`;
-
-const PaginationButtons = styled.div`
-  display: flex;
-  gap: 8px;
-`;
-
-const PaginationButton = styled.button`
-  padding: 6px 12px;
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 6px;
-  background-color: ${({ theme }) => theme.colors.background};
-  color: ${({ theme }) => theme.colors.primary};
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-
-  &:hover:not(:disabled) {
-    background-color: ${({ theme }) =>
-      theme.colors.primary === '#0D0D0D'
-        ? '#f0f0f0'
-        : 'rgba(255,255,255,0.08)'};
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  ${({ $active }) =>
-    $active &&
-    `
-    background-color: ${({ theme }) => theme.colors.accent};
-    color: #FFFFFF;
-    border-color: ${({ theme }) => theme.colors.accent};
-    
-    &:hover {
-      background-color: ${({ theme }) => theme.colors.accentHover || theme.colors.accent};
-    }
-  `}
-`;
 
 // Моковые данные tickets
 const mockTickets = [
@@ -1009,40 +947,13 @@ export const TicketsPage = () => {
             </RightPanel>
           </PageContainer>
 
-          <PaginationSection theme={theme}>
-            <TotalText theme={theme}>Total: {totalTickets}</TotalText>
-            <PaginationInfo>
-              <PaginationText theme={theme}>
-                Page {currentPage} of {totalPages} • Total {totalTickets}
-              </PaginationText>
-              <PaginationButtons>
-                <PaginationButton
-                  theme={theme}
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                >
-                  Prev
-                </PaginationButton>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <PaginationButton
-                    key={page}
-                    theme={theme}
-                    $active={currentPage === page}
-                    onClick={() => setCurrentPage(page)}
-                  >
-                    {page}
-                  </PaginationButton>
-                ))}
-                <PaginationButton
-                  theme={theme}
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                >
-                  Next
-                </PaginationButton>
-              </PaginationButtons>
-            </PaginationInfo>
-          </PaginationSection>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalTickets}
+            onPageChange={setCurrentPage}
+            itemsPerPage={10}
+          />
         </div>
       </ThemeProvider>
     </Layout>

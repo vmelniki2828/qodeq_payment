@@ -1,8 +1,9 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import styled, { ThemeProvider } from 'styled-components';
 import { useTheme } from '../contexts/ThemeContext';
 import { Layout } from '../components/Layout';
+import { Pagination } from '../components/Pagination';
 import { HiPencil, HiTrash, HiArrowUp, HiArrowDown, HiEye, HiChevronLeft } from 'react-icons/hi2';
 
 const HeaderSection = styled.div`
@@ -417,69 +418,6 @@ const ActionButton = styled.button`
   `}
 `;
 
-const PaginationSection = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px;
-  border-top: 1px solid ${({ theme }) => theme.colors.border};
-`;
-
-const TotalText = styled.span`
-  font-size: 14px;
-  color: ${({ theme }) => theme.colors.secondary};
-`;
-
-const PaginationInfo = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 16px;
-`;
-
-const PaginationText = styled.span`
-  font-size: 14px;
-  color: ${({ theme }) => theme.colors.secondary};
-`;
-
-const PaginationButtons = styled.div`
-  display: flex;
-  gap: 8px;
-`;
-
-const PaginationButton = styled.button`
-  padding: 6px 12px;
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 6px;
-  background-color: ${({ theme }) => theme.colors.background};
-  color: ${({ theme }) => theme.colors.primary};
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-
-  &:hover:not(:disabled) {
-    background-color: ${({ theme }) =>
-      theme.colors.primary === '#0D0D0D'
-        ? '#f0f0f0'
-        : 'rgba(255,255,255,0.08)'};
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  ${({ $active }) =>
-    $active &&
-    `
-    background-color: ${({ theme }) => theme.colors.accent};
-    color: #FFFFFF;
-    border-color: ${({ theme }) => theme.colors.accent};
-    
-    &:hover {
-      background-color: ${({ theme }) => theme.colors.accentHover || theme.colors.accent};
-    }
-  `}
-`;
 
 // Моковые данные tags
 const mockTags = [
@@ -544,8 +482,18 @@ const mockTags = [
 export const TagsPage = () => {
   const { theme } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const [tags, setTags] = useState(mockTags);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Проверяем параметр search из URL при загрузке страницы
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const searchParam = searchParams.get('search');
+    if (searchParam) {
+      setSearchQuery(searchParam);
+    }
+  }, [location.search]);
   const [sortField, setSortField] = useState('created_at');
   const [sortDirection, setSortDirection] = useState('desc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -895,40 +843,13 @@ export const TagsPage = () => {
             </RightPanel>
           </PageContainer>
 
-          <PaginationSection theme={theme}>
-            <TotalText theme={theme}>Total: {totalTags}</TotalText>
-            <PaginationInfo>
-              <PaginationText theme={theme}>
-                Page {currentPage} of {totalPages} • Total {totalTags}
-              </PaginationText>
-              <PaginationButtons>
-                <PaginationButton
-                  theme={theme}
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                >
-                  Prev
-                </PaginationButton>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <PaginationButton
-                    key={page}
-                    theme={theme}
-                    $active={currentPage === page}
-                    onClick={() => setCurrentPage(page)}
-                  >
-                    {page}
-                  </PaginationButton>
-                ))}
-                <PaginationButton
-                  theme={theme}
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                >
-                  Next
-                </PaginationButton>
-              </PaginationButtons>
-            </PaginationInfo>
-          </PaginationSection>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalTags}
+            onPageChange={setCurrentPage}
+            itemsPerPage={10}
+          />
         </div>
       </ThemeProvider>
     </Layout>

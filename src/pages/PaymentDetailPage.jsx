@@ -3,7 +3,16 @@ import { useParams, useNavigate } from 'react-router-dom';
 import styled, { ThemeProvider } from 'styled-components';
 import { useTheme } from '../contexts/ThemeContext';
 import { Layout } from '../components/Layout';
+import { Loader } from '../components/Loader';
 import { HiArrowPath, HiPencil, HiTrash, HiChevronLeft } from 'react-icons/hi2';
+
+// Функция для получения токена из куки
+const getCookie = (name) => {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
+};
 
 const PageContent = styled.div`
   height: 100%;
@@ -243,6 +252,11 @@ const IdItem = styled.div`
   font-family: monospace;
   font-size: 12px;
   color: ${({ $color, theme }) => $color || theme.colors.primary};
+  transition: opacity 0.15s ease;
+  
+  &:hover {
+    opacity: 0.7;
+  }
 `;
 
 const CopyIcon = styled.span`
@@ -282,58 +296,78 @@ const JsonContent = styled.pre`
   overflow-x: auto;
 `;
 
-// Моковые данные платежей
-const mockPayments = [
-  {
-    id: 1,
-    _id: '692ef39e1c07e718483352f1',
-    name: 'hgategelato',
-    activeOpen: true,
-    activePending: true,
-    externalIdType: 'transaction_reference',
-    createdAt: '2025-12-02 14:11:42',
-    updatedAt: '2025-12-02 14:11:42',
-    tagIds: [
-      '4f368b69-118c-41b3-b5b5-8b5a17e74a79',
-      '38ed4e48-40a7-464c-b76d-efce8688312f',
-      '3434a9fd-a77e-431b-821d-57454c22a6ba',
-      '5d45e65a-d4d7-4e12-b689-e54100f03127',
-    ],
-    gatewayIds: [
-      '692ef3bf1a9b21f5a26a7394',
-      '692ef4611a9b21f5a26a742f',
-      '692ef48f69b12babcd7521ea',
-      '692ef4db1a9b21f5a26a74a1',
-    ],
-    tagsDetail: [
-      { uuid: '4f368b69-118c-41b3-b5b5-8b5a17e74a79', id: 1, name: 'GELATO_SBP_ALFA_H2H_PAY_IN_TRUSTED' },
-      { uuid: '38ed4e48-40a7-464c-b76d-efce8688312f', id: 2, name: 'GELATO_SBP_ALFA_H2H_PAY_IN_FTD' },
-      { uuid: '3434a9fd-a77e-431b-821d-57454c22a6ba', id: 3, name: 'GELATO_P2P_RUB_H2H_PAY-IN' },
-      { uuid: '5d45e65a-d4d7-4e12-b689-e54100f03127', id: 4, name: 'GELATO_SBP_RUB_H2H_PAY-IN_TRUSTED' },
-    ],
-    gatewaysDetail: [
-      { id: '692ef3bf1a9b21f5a26a7394', name: 'GELATO_P2P_RUB_H2H_PAY-IN' },
-      { id: '692ef4611a9b21f5a26a742f', name: 'GELATO_SBP_ALFA_H2H_PAY_IN_FTD' },
-      { id: '692ef48f69b12babcd7521ea', name: 'GELATO_SBP_ALFA_H2H_PAY_IN_TRUSTED' },
-      { id: '692ef4db1a9b21f5a26a74a1', name: 'GELATO_SBP_RUB_H2H_PAY-IN_TRUSTED' },
-    ],
-  },
-];
-
 export const PaymentDetailPage = () => {
   const { theme } = useTheme();
   const { id } = useParams();
   const navigate = useNavigate();
   const [payment, setPayment] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Находим платеж по ID
-    const foundPayment = mockPayments.find((p) => p.id === Number(id) || p._id === id);
-    setPayment(foundPayment || null);
+    const fetchPayment = async () => {
+      setIsLoading(true);
+      try {
+        const token = getCookie('rb_admin_token');
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        const response = await fetch(`https://repayment.cat-tools.com/api/v1/admin/resources/payment/${id}`, {
+          method: 'GET',
+          headers,
+        });
+        if (response.status === 401) {
+          setPayment(null);
+          setIsLoading(false);
+          return;
+        }
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        // Сохраняем все данные из ответа API
+        setPayment(data);
+      } catch (err) {
+        console.error('Ошибка при загрузке платежа:', err);
+        setPayment(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchPayment();
+    }
   }, [id]);
 
-  const handleRefresh = () => {
-    console.log('Refresh payment', id);
+  const handleRefresh = async () => {
+    setIsLoading(true);
+    try {
+      const token = getCookie('rb_admin_token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const response = await fetch(`https://repayment.cat-tools.com/api/v1/admin/resources/payment/${id}`, {
+        method: 'GET',
+        headers,
+      });
+      if (response.status === 401) {
+        setPayment(null);
+        setIsLoading(false);
+        return;
+      }
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      // Сохраняем все данные из ответа API
+      setPayment(data);
+    } catch (err) {
+      console.error('Ошибка при обновлении платежа:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleEdit = () => {
@@ -355,6 +389,18 @@ export const PaymentDetailPage = () => {
     navigator.clipboard.writeText(text);
   };
 
+  if (isLoading) {
+    return (
+      <Layout>
+        <PageContent>
+          <ContentWrapper>
+            <Loader />
+          </ContentWrapper>
+        </PageContent>
+      </Layout>
+    );
+  }
+
   if (!payment) {
     return (
       <Layout>
@@ -367,9 +413,28 @@ export const PaymentDetailPage = () => {
     );
   }
 
+  // Функция для форматирования даты
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return dateString;
+      return date.toLocaleString('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }).replace(',', '');
+    } catch (e) {
+      return dateString;
+    }
+  };
+
   const formatValue = (value) => {
     if (Array.isArray(value)) {
-      return JSON.stringify(value);
+      return value.length > 0 ? JSON.stringify(value) : '[]';
     }
     if (typeof value === 'boolean') {
       return value.toString();
@@ -380,17 +445,18 @@ export const PaymentDetailPage = () => {
     return String(value);
   };
 
-  const fields = [
-    { field: '_id', value: payment._id },
-    { field: 'created_at', value: payment.createdAt },
-    { field: 'updated_at', value: payment.updatedAt },
-    { field: 'name', value: payment.name },
-    { field: 'external_id_type', value: payment.externalIdType },
-    { field: 'is_active_open', value: payment.activeOpen },
-    { field: 'is_active_pending', value: payment.activePending },
-    { field: 'tag_ids', value: payment.tagIds },
-    { field: 'gateway_ids', value: payment.gatewayIds },
-  ];
+  // Формируем список всех полей из ответа API для отображения
+  // Исключаем tags_detail и gateways_detail, так как они выводятся отдельно
+  const fields = Object.keys(payment)
+    .filter(key => key !== 'tags_detail' && key !== 'tagsDetail' && key !== 'gateways_detail' && key !== 'gatewaysDetail')
+    .map((key) => {
+      let value = payment[key];
+      // Форматируем даты
+      if (key === 'created_at' || key === 'updated_at' || key === 'createdAt' || key === 'updatedAt') {
+        value = formatDate(value);
+      }
+      return { field: key, value };
+    });
 
   return (
     <Layout>
@@ -398,7 +464,7 @@ export const PaymentDetailPage = () => {
         <PageContent>
           <HeaderSection theme={theme}>
             <Title theme={theme}>
-              Payments · {payment._id}
+              Payments · {payment._id || payment.id || id}
             </Title>
             <ButtonsGroup>
               <Button theme={theme} onClick={handleRefresh}>
@@ -427,10 +493,10 @@ export const PaymentDetailPage = () => {
               <Subsection>
                 <SubsectionTitle theme={theme}>Tags</SubsectionTitle>
                 <TagsList>
-                  {payment.tagsDetail?.map((tag, index) => (
+                  {(payment.tags_detail || payment.tagsDetail || []).map((tag, index) => (
                     <TagItem key={index} theme={theme}>
                       <TagDot $color="#3B82F6" />
-                      <span>{tag.name}</span>
+                      <span>{tag?.name || tag || '—'}</span>
                     </TagItem>
                   ))}
                 </TagsList>
@@ -439,14 +505,70 @@ export const PaymentDetailPage = () => {
               <Subsection>
                 <SubsectionTitle theme={theme}>Gateways</SubsectionTitle>
                 <TagsList>
-                  {payment.gatewaysDetail?.map((gateway, index) => (
+                  {(payment.gateways_detail || payment.gatewaysDetail || []).map((gateway, index) => (
                     <TagItem key={index} theme={theme}>
                       <TagDot $color="#10A37F" />
-                      <span>{gateway.name}</span>
+                      <span>{gateway?.name || gateway || '—'}</span>
                     </TagItem>
                   ))}
                 </TagsList>
-                <GoToChatButton theme={theme}>Go to Chat</GoToChatButton>
+                <GoToChatButton 
+                  theme={theme}
+                  onClick={async () => {
+                    try {
+                      // Пытаемся найти чат по payment name или payment ID
+                      const paymentName = payment.name || '';
+                      const paymentId = payment._id || payment.id || id;
+                      
+                      // Сначала пробуем использовать payment ID напрямую
+                      // Если не найдется, перейдем на страницу Chats с поиском
+                      const token = getCookie('rb_admin_token');
+                      const headers = { 'Content-Type': 'application/json' };
+                      if (token) {
+                        headers['Authorization'] = `Bearer ${token}`;
+                      }
+                      
+                      // Пробуем найти чат по payment name через API
+                      try {
+                        const chatsResponse = await fetch('https://repayment.cat-tools.com/api/v1/admin/chats', {
+                          method: 'GET',
+                          headers,
+                        });
+                        
+                        if (chatsResponse.ok) {
+                          const chatsData = await chatsResponse.json();
+                          const chats = Array.isArray(chatsData) ? chatsData : [];
+                          // Ищем чат по payment name
+                          const foundChat = chats.find((chat) => 
+                            chat.payment === paymentName || 
+                            chat.payment_name === paymentName ||
+                            chat.payment_id === paymentId ||
+                            chat._id === paymentId ||
+                            chat.id === paymentId
+                          );
+                          
+                          if (foundChat) {
+                            const chatId = foundChat.id || foundChat._id || foundChat.id;
+                            navigate(`/models/chats/${chatId}`);
+                            return;
+                          }
+                        }
+                      } catch (err) {
+                        console.error('Ошибка при поиске чата:', err);
+                      }
+                      
+                      // Если чат не найден, переходим на страницу Chats с поиском
+                      navigate(`/models/chats?search=${encodeURIComponent(paymentName || paymentId)}`);
+                    } catch (err) {
+                      console.error('Ошибка при переходе к чату:', err);
+                      // В случае ошибки переходим на страницу Chats с поиском
+                      const paymentName = payment.name || payment._id || payment.id || id;
+                      navigate(`/models/chats?search=${encodeURIComponent(paymentName)}`);
+                    }
+                  }}
+                >
+                  Go to Chat
+                </GoToChatButton>
               </Subsection>
             </RelationsSection>
 
@@ -462,25 +584,53 @@ export const PaymentDetailPage = () => {
                   <TableRow key={index} theme={theme}>
                     <FieldCell theme={theme}>{item.field}</FieldCell>
                     <ValueCell theme={theme}>
-                      {item.field === '_id' ? (
+                      {(item.field === '_id' || item.field === 'id') ? (
                         <IdValue onClick={() => handleCopyId(item.value)}>
                           {formatValue(item.value)}
                         </IdValue>
-                      ) : item.field === 'tag_ids' ? (
+                      ) : (item.field === 'tag_ids' || item.field === 'tagIds') && Array.isArray(item.value) ? (
                         <IdList>
-                          {Array.isArray(item.value) && item.value.map((id, idx) => (
-                            <IdItem key={idx} $color="#3B82F6" theme={theme}>
+                          {item.value.map((id, idx) => (
+                            <IdItem 
+                              key={idx} 
+                              $color="#3B82F6" 
+                              theme={theme}
+                              style={{ cursor: 'pointer' }}
+                              onClick={() => navigate(`/models/tags?search=${encodeURIComponent(id)}`)}
+                              title="Перейти на страницу Tags с поиском"
+                            >
                               {id}
-                              <CopyIcon onClick={() => handleCopyId(id)}>📋</CopyIcon>
+                              <CopyIcon 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCopyId(id);
+                                }}
+                              >
+                                📋
+                              </CopyIcon>
                             </IdItem>
                           ))}
                         </IdList>
-                      ) : item.field === 'gateway_ids' ? (
+                      ) : (item.field === 'gateway_ids' || item.field === 'gatewayIds') && Array.isArray(item.value) ? (
                         <IdList>
-                          {Array.isArray(item.value) && item.value.map((id, idx) => (
-                            <IdItem key={idx} $color="#6B6B6B" theme={theme}>
+                          {item.value.map((id, idx) => (
+                            <IdItem 
+                              key={idx} 
+                              $color="#3B82F6" 
+                              theme={theme}
+                              style={{ cursor: 'pointer' }}
+                              onClick={() => navigate(`/models/gateways?search=${encodeURIComponent(id)}`)}
+                              title="Перейти на страницу Gateways с поиском"
+                            >
                               {id}
-                              <CopyIcon onClick={() => handleCopyId(id)}>📋</CopyIcon>
+                              <CopyIcon 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCopyId(id);
+                                }}
+                              >
+                                📋
+                              </CopyIcon>
                             </IdItem>
                           ))}
                         </IdList>
@@ -493,19 +643,23 @@ export const PaymentDetailPage = () => {
               </TableBody>
             </DetailsTable>
 
-            <JsonSection theme={theme}>
-              <JsonTitle theme={theme}>tags_detail</JsonTitle>
-              <JsonContent theme={theme}>
-                {JSON.stringify(payment.tagsDetail, null, 2)}
-              </JsonContent>
-            </JsonSection>
+            {(payment.tags_detail || payment.tagsDetail) && (
+              <JsonSection theme={theme}>
+                <JsonTitle theme={theme}>tags_detail</JsonTitle>
+                <JsonContent theme={theme}>
+                  {JSON.stringify(payment.tags_detail || payment.tagsDetail, null, 2)}
+                </JsonContent>
+              </JsonSection>
+            )}
 
-            <JsonSection theme={theme}>
-              <JsonTitle theme={theme}>gateways_detail</JsonTitle>
-              <JsonContent theme={theme}>
-                {JSON.stringify(payment.gatewaysDetail, null, 2)}
-              </JsonContent>
-            </JsonSection>
+            {(payment.gateways_detail || payment.gatewaysDetail) && (
+              <JsonSection theme={theme}>
+                <JsonTitle theme={theme}>gateways_detail</JsonTitle>
+                <JsonContent theme={theme}>
+                  {JSON.stringify(payment.gateways_detail || payment.gatewaysDetail, null, 2)}
+                </JsonContent>
+              </JsonSection>
+            )}
           </ContentWrapper>
         </PageContent>
       </ThemeProvider>

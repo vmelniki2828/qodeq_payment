@@ -472,8 +472,9 @@ export const OpenAIStatsPage = () => {
     // Установка дат по умолчанию (сегодня)
     const today = new Date();
     const dateString = today.toISOString().split('T')[0];
-    if (!startDate) setStartDate(dateString);
-    if (!endDate) setEndDate(dateString);
+    setStartDate(dateString);
+    setEndDate(dateString);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

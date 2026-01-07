@@ -1,9 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled, { ThemeProvider } from 'styled-components';
 import { useTheme } from '../contexts/ThemeContext';
 import { Layout } from '../components/Layout';
+import { Loader } from '../components/Loader';
+import { Pagination } from '../components/Pagination';
 import { HiPencil, HiTrash, HiArrowUp, HiArrowDown, HiEye, HiChevronLeft } from 'react-icons/hi2';
+
+// Функция для получения токена из куки
+const getCookie = (name) => {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
+};
 
 const HeaderSection = styled.div`
   display: flex;
@@ -454,210 +464,12 @@ const ActionButton = styled.button`
   `}
 `;
 
-const PaginationSection = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px;
-  border-top: 1px solid ${({ theme }) => theme.colors.border};
-`;
-
-const TotalText = styled.span`
-  font-size: 14px;
-  color: ${({ theme }) => theme.colors.secondary};
-`;
-
-const PaginationInfo = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 16px;
-`;
-
-const PaginationText = styled.span`
-  font-size: 14px;
-  color: ${({ theme }) => theme.colors.secondary};
-`;
-
-const PaginationButtons = styled.div`
-  display: flex;
-  gap: 8px;
-`;
-
-const PaginationButton = styled.button`
-  padding: 6px 12px;
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 6px;
-  background-color: ${({ theme }) => theme.colors.background};
-  color: ${({ theme }) => theme.colors.primary};
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-
-  &:hover:not(:disabled) {
-    background-color: ${({ theme }) =>
-      theme.colors.primary === '#0D0D0D'
-        ? '#f0f0f0'
-        : 'rgba(255,255,255,0.08)'};
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  ${({ $active }) =>
-    $active &&
-    `
-    background-color: ${({ theme }) => theme.colors.accent};
-    color: #FFFFFF;
-    border-color: ${({ theme }) => theme.colors.accent};
-    
-    &:hover {
-      background-color: ${({ theme }) => theme.colors.accentHover || theme.colors.accent};
-    }
-  `}
-`;
-
-// Моковые данные payment aliases
-const mockPaymentAliases = [
-  {
-    id: 1,
-    _id: '68d4417d7e896416537d894a',
-    paymentId: '68c981d834af2e47cb02aa0c',
-    alias: 'Bnpay',
-    normalized: 'bnpay',
-    lang: 'en',
-    weight: 1.5,
-    createdAt: '2025-12-05 04:45:14',
-    updatedAt: '2025-12-05 04:45:14',
-    embedding: null,
-  },
-  {
-    id: 2,
-    _id: '68d4417d7e896416537d8942',
-    paymentId: '68c981d834af2e47cb02aa0b',
-    alias: 'betatransfer',
-    normalized: 'betatransfer',
-    lang: 'en',
-    weight: 1.3,
-    createdAt: '2025-12-02 13:56:04',
-    updatedAt: '2025-12-02 13:56:04',
-    embedding: null,
-  },
-  {
-    id: 3,
-    _id: '68d4417d7e896416537d893c',
-    paymentId: '68c981d834af2e47cb02aa0a',
-    alias: 'Defpai',
-    normalized: 'defpai',
-    lang: 'en',
-    weight: 0.9,
-    createdAt: '2025-11-04 11:01:21',
-    updatedAt: '2025-11-04 11:01:21',
-    embedding: null,
-  },
-  {
-    id: 4,
-    _id: '68d4417d7e896416537d8948',
-    paymentId: '68c981d834af2e47cb02aa0b',
-    alias: 'Pay Betatransfer',
-    normalized: 'pay betatransfer',
-    lang: 'en',
-    weight: 0.75,
-    createdAt: '2025-11-04 10:58:15',
-    updatedAt: '2025-11-04 10:58:15',
-    embedding: null,
-  },
-  {
-    id: 5,
-    _id: '68d4417d7e896416537d8945',
-    paymentId: '68c981d834af2e47cb02aa0c',
-    alias: 'Bnpay',
-    normalized: 'bnpay',
-    lang: 'en',
-    weight: 1.2,
-    createdAt: '2025-11-04 10:55:30',
-    updatedAt: '2025-11-04 10:55:30',
-    embedding: null,
-  },
-  {
-    id: 6,
-    _id: '68d4417d7e896416537d8941',
-    paymentId: '68c981d834af2e47cb02aa0a',
-    alias: 'Defpai',
-    normalized: 'defpai',
-    lang: 'en',
-    weight: 0.85,
-    createdAt: '2025-11-04 10:52:45',
-    updatedAt: '2025-11-04 10:52:45',
-    embedding: null,
-  },
-  {
-    id: 7,
-    _id: '68d4417d7e896416537d8943',
-    paymentId: '68c981d834af2e47cb02aa0b',
-    alias: 'betatransfer',
-    normalized: 'betatransfer',
-    lang: 'en',
-    weight: 1.1,
-    createdAt: '2025-11-04 10:50:00',
-    updatedAt: '2025-11-04 10:50:00',
-    embedding: null,
-  },
-  {
-    id: 8,
-    _id: '68d4417d7e896416537d8946',
-    paymentId: '68c981d834af2e47cb02aa0c',
-    alias: 'Bnpay',
-    normalized: 'bnpay',
-    lang: 'en',
-    weight: 1.0,
-    createdAt: '2025-11-04 10:47:15',
-    updatedAt: '2025-11-04 10:47:15',
-    embedding: null,
-  },
-  {
-    id: 9,
-    _id: '68d4417d7e896416537d8944',
-    paymentId: '68c981d834af2e47cb02aa0b',
-    alias: 'Pay Betatransfer',
-    normalized: 'pay betatransfer',
-    lang: 'en',
-    weight: 0.7,
-    createdAt: '2025-11-04 10:44:30',
-    updatedAt: '2025-11-04 10:44:30',
-    embedding: null,
-  },
-  {
-    id: 10,
-    _id: '68d4417d7e896416537d893d',
-    paymentId: '68c981d834af2e47cb02aa0a',
-    alias: 'Дефпэй',
-    normalized: 'дефпэй',
-    lang: 'ru',
-    weight: 0.85,
-    createdAt: '2025-11-04 10:41:45',
-    updatedAt: '2025-11-04 10:41:45',
-    embedding: null,
-  },
-  {
-    id: 11,
-    _id: '68d4417d7e896416537d8947',
-    paymentId: '68c981d834af2e47cb02aa0b',
-    alias: 'бетатрансфер',
-    normalized: 'бетатрансфер',
-    lang: 'ru',
-    weight: 0.8,
-    createdAt: '2025-11-04 10:39:00',
-    updatedAt: '2025-11-04 10:39:00',
-    embedding: null,
-  },
-];
 
 export const PaymentAliasesPage = () => {
   const { theme } = useTheme();
   const navigate = useNavigate();
-  const [aliases, setAliases] = useState(mockPaymentAliases);
+  const [aliases, setAliases] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState('created_at');
   const [sortDirection, setSortDirection] = useState('desc');
@@ -671,6 +483,54 @@ export const PaymentAliasesPage = () => {
     lang: 'en',
     weight: 1.0,
   });
+
+  // Загрузка данных из API
+  const fetchAvailablePayments = async () => {
+    setIsLoading(true);
+    try {
+      const token = getCookie('rb_admin_token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const response = await fetch('https://repayment.cat-tools.com/api/v1/admin/chats/available-payments', {
+        method: 'GET',
+        headers,
+      });
+      if (response.status === 401) {
+        setAliases([]);
+        setIsLoading(false);
+        return;
+      }
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      // Преобразуем данные API в формат, который ожидает компонент
+      const formattedAliases = Array.isArray(data) ? data.map((item, index) => ({
+        id: item.id || item._id || index + 1,
+        _id: item._id || item.id || `alias_${index}`,
+        paymentId: item.payment_id || item.paymentId || '',
+        alias: item.alias || item.alias_text || '',
+        normalized: item.normalized || item.normalized_text || '',
+        lang: item.lang || 'en',
+        weight: item.weight || 1.0,
+        createdAt: item.created_at || item.createdAt || '',
+        updatedAt: item.updated_at || item.updatedAt || '',
+        embedding: item.embedding || null,
+      })) : [];
+      setAliases(formattedAliases);
+    } catch (err) {
+      console.error('Ошибка при загрузке available payments:', err);
+      setAliases([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAvailablePayments();
+  }, []);
 
   const filteredAliases = aliases.filter((alias) => {
     const matchesSearch =
@@ -736,7 +596,7 @@ export const PaymentAliasesPage = () => {
   };
 
   const handleRefresh = () => {
-    console.log('Refresh payment aliases');
+    fetchAvailablePayments();
   };
 
   const handleCreate = () => {
@@ -835,6 +695,26 @@ export const PaymentAliasesPage = () => {
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = startIndex + ITEMS_PER_PAGE;
   const paginatedAliases = sortedAliases.slice(startIndex, endIndex);
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <ThemeProvider theme={theme}>
+          <div
+            style={{
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <Loader />
+          </div>
+        </ThemeProvider>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -1083,40 +963,13 @@ export const PaymentAliasesPage = () => {
             </RightPanel>
           </PageContainer>
 
-          <PaginationSection theme={theme}>
-            <TotalText theme={theme}>Total: {totalAliases}</TotalText>
-            <PaginationInfo>
-              <PaginationText theme={theme}>
-                Page {currentPage} of {totalPages} • Total {totalAliases}
-              </PaginationText>
-              <PaginationButtons>
-                <PaginationButton
-                  theme={theme}
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                >
-                  Prev
-                </PaginationButton>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <PaginationButton
-                    key={page}
-                    theme={theme}
-                    $active={currentPage === page}
-                    onClick={() => setCurrentPage(page)}
-                  >
-                    {page}
-                  </PaginationButton>
-                ))}
-                <PaginationButton
-                  theme={theme}
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                >
-                  Next
-                </PaginationButton>
-              </PaginationButtons>
-            </PaginationInfo>
-          </PaginationSection>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalAliases}
+            onPageChange={setCurrentPage}
+            itemsPerPage={10}
+          />
         </div>
       </ThemeProvider>
     </Layout>
